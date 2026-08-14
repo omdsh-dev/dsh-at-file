@@ -18,7 +18,7 @@ import { AtFileRuntime } from './runtime.ts'
 import { TYPERT_MANIFEST } from './typert.ts'
 import { registerAtFileSettings } from './settings.ts'
 import { mentionPreStep } from './mention.ts'
-import type { ResolvedConfig } from './types.ts'
+import type { DirectoryMode, ResolvedConfig } from './types.ts'
 
 /** Cordis plugin name (the Loader entry and client bundle id). */
 export const name = 'dsh-at-file'
@@ -32,19 +32,25 @@ export interface Config {
   maxIndexedFiles: number
   /** Hard cap on one file read; larger files are refused, never truncated. */
   maxFileBytes: number
+  /** Hard cap on one serialized directory attachment. */
+  maxTotalBytes: number
+  /** Metadata-only by default; bounded mode includes text within the aggregate cap. */
+  directoryMode: DirectoryMode
   /** Directory basenames the index walk skips entirely. */
   ignoreDirs: string[]
 }
 
 /**
  * Configuration schema: deployment-varying bounds stay tunable from
- * cordis.yml. The inferred schema type keeps the callable form accepting
+ * the profile patch. The inferred schema type keeps the callable form accepting
  * partial input, so `Config({})` yields the defaults (what the Loader does
- * for cordis.yml compositions).
+ * for Loader compositions).
  */
 export const Config = z.object({
   maxIndexedFiles: z.natural().min(1).default(5000),
   maxFileBytes: z.natural().min(1).default(256 * 1024),
+  maxTotalBytes: z.natural().min(1024).default(1024 * 1024),
+  directoryMode: z.union(['manifest', 'bounded'] as const).default('manifest'),
   ignoreDirs: z.array(z.string()).default(['.git', 'node_modules']),
 })
 

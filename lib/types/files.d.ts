@@ -1,4 +1,4 @@
-import type { FileContent, FileEntry, ReadTreeResult } from './contract.ts';
+import type { DirectoryMode, FileContent, FileEntry, ReadTreeResult } from './contract.ts';
 /** Options for one bounded index pass. */
 export interface IndexOptions {
     /** Hard cap on collected files. */
@@ -11,6 +11,12 @@ export interface WorkspaceIndex {
     readonly files: readonly FileEntry[];
     /** True when the walk hit `maxFiles` before the tree was exhausted. */
     readonly truncated: boolean;
+}
+/** Bounds and representation for one directory mention. */
+export interface ReadTreeOptions extends IndexOptions {
+    readonly maxFileBytes: number;
+    readonly maxTotalBytes: number;
+    readonly mode: DirectoryMode;
 }
 /**
  * Collect every regular file under `root` (bounded, name-sorted).
@@ -30,13 +36,10 @@ export declare function indexWorkspace(root: string, options: IndexOptions, sign
  */
 export declare function readFileText(path: string, maxBytes: number, signal?: AbortSignal): Promise<FileContent>;
 /**
- * Read every file under one directory recursively, bounded per file and in
- * count. The result reports `truncated` when either bound cut the tree.
+ * Represent one directory recursively as a metadata manifest or bounded text.
  * @param path - absolute directory path (files and missing entries are refused).
- * @param maxFiles - hard cap on read files.
- * @param maxBytes - per-file cap (larger files refuse the whole tree).
- * @param ignoreDirs - directory basenames the walk skips.
+ * @param options - file-count, per-file, aggregate, ignore, and mode bounds.
  * @param signal - caller lifetime.
- * @returns the read files (each `relative` to the directory root) and the truncation flag.
+ * @returns deterministic metadata, accepted text, omissions, and truncation state.
  */
-export declare function readTree(path: string, maxFiles: number, maxBytes: number, ignoreDirs: readonly string[], signal?: AbortSignal): Promise<ReadTreeResult>;
+export declare function readTree(path: string, options: ReadTreeOptions, signal?: AbortSignal): Promise<ReadTreeResult>;

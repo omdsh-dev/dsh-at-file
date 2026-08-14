@@ -1,7 +1,7 @@
 {
   "name": "dsh-at-file",
   "description": "Codex-style @file mentions for the DeepSeek Harness web GUI: type @ in the composer to search workspace files and attach them to the prompt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",

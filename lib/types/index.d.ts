@@ -9,6 +9,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
+import type { DirectoryMode } from './types.ts';
 /** Cordis plugin name (the Loader entry and client bundle id). */
 export declare const name = "dsh-at-file";
 /** Services required before load: the Typert registry, the settings provider, and the agent registry. */
@@ -19,22 +20,30 @@ export interface Config {
     maxIndexedFiles: number;
     /** Hard cap on one file read; larger files are refused, never truncated. */
     maxFileBytes: number;
+    /** Hard cap on one serialized directory attachment. */
+    maxTotalBytes: number;
+    /** Metadata-only by default; bounded mode includes text within the aggregate cap. */
+    directoryMode: DirectoryMode;
     /** Directory basenames the index walk skips entirely. */
     ignoreDirs: string[];
 }
 /**
  * Configuration schema: deployment-varying bounds stay tunable from
- * cordis.yml. The inferred schema type keeps the callable form accepting
+ * the profile patch. The inferred schema type keeps the callable form accepting
  * partial input, so `Config({})` yields the defaults (what the Loader does
- * for cordis.yml compositions).
+ * for Loader compositions).
  */
 export declare const Config: z<Schemastery.ObjectS<{
     maxIndexedFiles: z<number, number>;
     maxFileBytes: z<number, number>;
+    maxTotalBytes: z<number, number>;
+    directoryMode: z<"manifest" | "bounded", "manifest" | "bounded">;
     ignoreDirs: z<string[], string[]>;
 }>, Schemastery.ObjectT<{
     maxIndexedFiles: z<number, number>;
     maxFileBytes: z<number, number>;
+    maxTotalBytes: z<number, number>;
+    directoryMode: z<"manifest" | "bounded", "manifest" | "bounded">;
     ignoreDirs: z<string[], string[]>;
 }>>;
 /**

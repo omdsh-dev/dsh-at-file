@@ -25,9 +25,43 @@ export interface ReadTreeFile {
     readonly content: string;
     readonly bytes: number;
 }
+/** How a directory mention is represented to the model. */
+export type DirectoryMode = 'manifest' | 'bounded';
+/** One metadata-only entry in a directory manifest. */
+export interface ReadTreeEntry {
+    readonly relative: string;
+    readonly kind: 'file' | 'dir';
+    /** Undefined when the entry disappeared or could not be stated. */
+    readonly bytes?: number;
+}
+/** Why one file was omitted from a bounded directory attachment. */
+export type ReadTreeSkipReason = 'oversized' | 'binary' | 'unreadable' | 'aggregate-limit';
+/** Structured metadata for one omitted directory descendant. */
+export type ReadTreeSkipped = {
+    readonly relative: string;
+    readonly reason: 'oversized';
+    readonly bytes: number;
+    readonly limit: number;
+} | {
+    readonly relative: string;
+    readonly reason: 'binary';
+    readonly bytes?: number;
+} | {
+    readonly relative: string;
+    readonly reason: 'unreadable';
+} | {
+    readonly relative: string;
+    readonly reason: 'aggregate-limit';
+    readonly bytes: number;
+    readonly limit: number;
+};
 /** One bounded directory read (the Host mention expansion's directory result). */
 export interface ReadTreeResult {
+    readonly mode: DirectoryMode;
+    readonly entries: readonly ReadTreeEntry[];
     readonly files: readonly ReadTreeFile[];
+    readonly skipped: readonly ReadTreeSkipped[];
+    readonly includedBytes: number;
     readonly truncated: boolean;
 }
 /** The `at-file` settings namespace's durable shape (host and client share it). */

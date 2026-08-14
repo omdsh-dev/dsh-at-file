@@ -1,8 +1,8 @@
 /**
  * The Host-side @file mention expansion: recognizes `@path` tokens in the
  * outgoing user message and, at the `agent/pre-step` boundary, reads each
- * referenced file (or directory, recursively) and injects its content as a
- * user-role message the model reads directly. Only `source.kind === 'user'`
+ * referenced file or builds a bounded directory representation as a user-role
+ * message the model reads directly. Only `source.kind === 'user'`
  * text is scanned — external text cannot forge the gesture — and every path
  * resolves against the session's workspace cwd.
  */
@@ -12,6 +12,7 @@ import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { readFileText, readTree } from './files.ts'
+import type { ReadTreeResult, ReadTreeSkipped } from './contract.ts'
 import type { ResolvedConfig } from './types.ts'
 
 /** One recognized mention: its workspace-relative token and resolved kind. */
@@ -82,21 +83,141 @@ async function resolveMention(
 /** The model form of one attached file. */
 function fileForm(relative: string, content: string): string {
   const body = content.endsWith('\n') ? content : `${content}\n`
-  return `<file path="${relative}">\n${body}</file>`
+  return `<file path="${escapeAttribute(relative)}">\n${body}</file>`
 }
 
-/** The model form of one attached directory (one file block per subtree file). */
-function dirForm(relative: string, files: readonly { relative: string; content: string }[], truncated: boolean): string {
+/** Escape one XML-like attribute without modifying attached file content. */
+function escapeAttribute(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+interface DirectoryCandidate {
+  readonly kind: 'entry' | 'file' | 'omission'
+  readonly text: string
+  readonly bytes?: number
+}
+
+/** Deterministically retain candidates whose complete serialized form fits. */
+function selectCandidates(candidates: readonly DirectoryCandidate[], bodyBudget: number): readonly DirectoryCandidate[] {
+  const selected: DirectoryCandidate[] = []
+  let used = 0
+  for (const candidate of candidates) {
+    const next = Buffer.byteLength(candidate.text) + 1
+    if (used + next > bodyBudget) continue
+    selected.push(candidate)
+    used += next
+  }
+  return selected
+}
+
+/** Human- and model-readable reason for one bounded-mode omission. */
+function omissionReason(skipped: ReadTreeSkipped): string {
+  switch (skipped.reason) {
+    case 'oversized':
+      return `${String(skipped.bytes)} bytes exceeds maxFileBytes=${String(skipped.limit)}`
+    case 'binary':
+      return 'binary, PDF, or non-UTF-8 file'
+    case 'aggregate-limit':
+      return `${String(skipped.bytes)} bytes would exceed maxTotalBytes=${String(skipped.limit)}`
+    case 'unreadable':
+      return 'unreadable file'
+  }
+}
+
+/** Serialize a metadata-only directory manifest under the aggregate output cap. */
+function manifestForm(relative: string, tree: ReadTreeResult, maxTotalBytes: number): string {
+  /* v8 ignore next -- mention tokens are normalized to no trailing slash. */
+  const prefix = `${relative.endsWith('/') ? relative : `${relative}/`}`
+  const candidates: DirectoryCandidate[] = tree.entries.map(entry => ({
+    kind: 'entry',
+    /* v8 ignore next -- size is unknown only when an indexed file disappears before its manifest stat. */
+    text: entry.kind === 'dir'
+      ? `<entry path="${escapeAttribute(`${prefix}${entry.relative}`)}" type="directory" />`
+      : `<entry path="${escapeAttribute(`${prefix}${entry.relative}`)}" type="file" size="${entry.bytes === undefined ? 'unknown' : String(entry.bytes)}" />`,
+  }))
+  const header = (included: number, omitted: number, truncated: boolean): string =>
+    `<directory path="${escapeAttribute(relative)}" mode="manifest" truncated="${String(truncated)}" ` +
+    `included-entries="${String(included)}" omitted-entries="${String(omitted)}" max-total-bytes="${String(maxTotalBytes)}">`
+  const footer = '\n</directory>'
+  const reserved = Buffer.byteLength(header(candidates.length, candidates.length, false)) + Buffer.byteLength(footer)
+  /* v8 ignore start -- Config enforces >= 1024 bytes; only an OS-invalid path longer than that can exhaust the header. */
+  if (reserved > maxTotalBytes) {
+    throw new Error(`at-file: maxTotalBytes=${String(maxTotalBytes)} is too small to represent directory "${relative}"`)
+  }
+  /* v8 ignore stop */
+  const selected = selectCandidates(candidates, maxTotalBytes - reserved)
+  const omitted = candidates.length - selected.length
+  const output = `${header(selected.length, omitted, tree.truncated || omitted > 0)}` +
+    `${selected.map(candidate => `\n${candidate.text}`).join('')}${footer}`
+  return output
+}
+
+/** Serialize bounded directory contents and their omission report under the output cap. */
+function boundedForm(relative: string, tree: ReadTreeResult, maxTotalBytes: number): string {
   // resolveMention strips a trailing slash before this is called, so the
   // slash-preserving arm is unreachable from the public path.
   /* v8 ignore next -- the mention token is normalized to no trailing slash. */
   const prefix = `${relative.endsWith('/') ? relative : `${relative}/`}`
-  const blocks = files.map(file => {
+  const omissions: DirectoryCandidate[] = tree.skipped.map(skipped => ({
+    kind: 'omission',
+    text: `<omitted path="${escapeAttribute(`${prefix}${skipped.relative}`)}" reason="${omissionReason(skipped)}" />`,
+  }))
+  const files: DirectoryCandidate[] = tree.files.map(file => {
     const body = file.content.endsWith('\n') ? file.content : `${file.content}\n`
-    return `<file path="${prefix}${file.relative}">\n${body}</file>`
-  }).join('\n')
-  const tail = truncated ? `\n<!-- directory truncated: more files exist under "${relative}" -->` : ''
-  return `<directory path="${relative}">\n${blocks}${tail}\n</directory>`
+    return {
+      kind: 'file',
+      text: `<file path="${escapeAttribute(`${prefix}${file.relative}`)}">\n${body}</file>`,
+      bytes: file.bytes,
+    }
+  })
+  const candidates = [...omissions, ...files]
+  const totalFiles = tree.skipped.length + tree.files.length
+  const header = (
+    included: number,
+    omitted: number,
+    reported: number,
+    includedBytes: number,
+    truncated: boolean,
+  ): string =>
+    `<directory path="${escapeAttribute(relative)}" mode="bounded" truncated="${String(truncated)}" ` +
+    `included-files="${String(included)}" omitted-files="${String(omitted)}" ` +
+    `reported-omissions="${String(reported)}" included-bytes="${String(includedBytes)}" ` +
+    `max-total-bytes="${String(maxTotalBytes)}">`
+  const footer = '\n</directory>'
+  const reserved = Buffer.byteLength(header(totalFiles, totalFiles, tree.skipped.length, maxTotalBytes, false)) +
+    Buffer.byteLength(footer)
+  /* v8 ignore start -- Config enforces >= 1024 bytes; only an OS-invalid path longer than that can exhaust the header. */
+  if (reserved > maxTotalBytes) {
+    throw new Error(`at-file: maxTotalBytes=${String(maxTotalBytes)} is too small to represent directory "${relative}"`)
+  }
+  /* v8 ignore stop */
+  const selected = selectCandidates(candidates, maxTotalBytes - reserved)
+  const included = selected.filter(candidate => candidate.kind === 'file')
+  const reported = selected.filter(candidate => candidate.kind === 'omission').length
+  const includedBytes = included.reduce((sum, candidate) => {
+    /* v8 ignore next -- `included` is filtered to file candidates, which always carry bytes. */
+    return sum + (candidate.bytes ?? 0)
+  }, 0)
+  const omitted = totalFiles - included.length
+  const output = header(included.length, omitted, reported, includedBytes, tree.truncated || omitted > 0) +
+    `${selected.map(candidate => `\n${candidate.text}`).join('')}${footer}`
+  return output
+}
+
+/** The model form of one attached directory. */
+function dirForm(relative: string, tree: ReadTreeResult, maxTotalBytes: number): string {
+  const output = tree.mode === 'manifest'
+    ? manifestForm(relative, tree, maxTotalBytes)
+    : boundedForm(relative, tree, maxTotalBytes)
+  /* v8 ignore next -- both serializers reserve their maximum-width header and exact body bytes. */
+  if (Buffer.byteLength(output) > maxTotalBytes) {
+    throw new Error('at-file: internal directory serialization exceeded maxTotalBytes')
+  }
+  return output
 }
 
 /**
@@ -130,8 +251,14 @@ export async function expandMentions(
     if (mention === undefined) continue
     let form: string
     if (mention.kind === 'dir') {
-      const tree = await readTree(mention.absolute, config.maxIndexedFiles, config.maxFileBytes, config.ignoreDirs, signal)
-      form = dirForm(mention.relative, tree.files, tree.truncated)
+      const tree = await readTree(mention.absolute, {
+        maxFiles: config.maxIndexedFiles,
+        maxFileBytes: config.maxFileBytes,
+        maxTotalBytes: config.maxTotalBytes,
+        mode: config.directoryMode,
+        ignoreDirs: config.ignoreDirs,
+      }, signal)
+      form = dirForm(mention.relative, tree, config.maxTotalBytes)
     } else {
       const content = await readFileText(mention.absolute, config.maxFileBytes, signal)
       form = fileForm(mention.relative, content.content)

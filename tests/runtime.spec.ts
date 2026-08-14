@@ -138,9 +138,13 @@ describe('dsh-at-file host composition', () => {
     expect(plugin.Config({})).toEqual({
       maxIndexedFiles: 5000,
       maxFileBytes: 262144,
+      maxTotalBytes: 1048576,
+      directoryMode: 'manifest',
       ignoreDirs: ['.git', 'node_modules'],
     })
     expect(() => plugin.Config({ maxIndexedFiles: 0 })).toThrow()
     expect(() => plugin.Config({ maxFileBytes: 0 })).toThrow()
+    expect(() => plugin.Config({ maxTotalBytes: 1023 })).toThrow()
+    expect(() => plugin.Config({ directoryMode: 'eager' as never })).toThrow()
   })
 })

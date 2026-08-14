@@ -3,7 +3,9 @@
  * types live in `contract.ts` and are re-exported here for the host entry.
  */
 
-export type { AtFileSettings, FileEntry } from './contract.ts'
+export type { AtFileSettings, DirectoryMode, FileEntry } from './contract.ts'
+
+import type { DirectoryMode } from './contract.ts'
 
 /** Resolved plugin configuration (schema defaults applied). */
 export interface ResolvedConfig {
@@ -11,6 +13,10 @@ export interface ResolvedConfig {
   readonly maxIndexedFiles: number
   /** Hard cap on one file read; larger files are refused, never truncated. */
   readonly maxFileBytes: number
+  /** Hard cap on one serialized directory attachment. */
+  readonly maxTotalBytes: number
+  /** Metadata-only by default; bounded mode includes text within the aggregate cap. */
+  readonly directoryMode: DirectoryMode
   /** Directory basenames the index walk skips entirely. */
   readonly ignoreDirs: readonly string[]
 }

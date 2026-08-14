@@ -15,7 +15,7 @@ DeepSeek Harness Web GUI 的 Codex 风格 `@` 文件提及插件。在输入框�
 模型:     <file path="README.md">…内容…</file>   ← 发送时注入
 ```
 
-草稿里是纯文本 `@路径` token（无芯片、不溢出）；Host 在每个 agent 的 pre-step 边界把它展开成文件内容。附加目录会递归展开其下所有文件（有界）。
+草稿里是纯文本 `@路径` token（无芯片、不溢出）。Host 在每个 agent 的 pre-step 边界把文件提及展开成文本；目录提及默认展开为有界的元数据清单，让模型再通过常规工作区工具按需读取相关文件，避免预先塞入整棵目录。
 
 ## 安装
 
@@ -29,25 +29,30 @@ dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/re
 
 ## 配置
 
-Host 侧可调参数在 `cordis.yml` 的插件行上：
+Host 侧参数写在所选 profile 的 patch 中，例如 `~/.dsh/profiles/web/cordis.patch.yml`。profile patch 会整体替换 `config`，因此修改一个参数时也要保留其余全部字段：
 
 ```yaml
 - id: dsh-at-file
-  name: dsh-at-file
   config:
     maxIndexedFiles: 5000      # 每个工作区索引条目数上限（到达即停止遍历并如实报告截断）
-    maxFileBytes: 262144       # 单个附加文件字节上限；超限文件拒绝附加，绝不截断
+    maxFileBytes: 262144       # 直接文本文件或 bounded 模式下单个文件的上限
+    maxTotalBytes: 1048576     # 完整目录序列化结果的硬上限
+    directoryMode: manifest    # manifest（推荐）或 bounded
     ignoreDirs: ['.git', 'node_modules']   # 遍历时跳过的目录名
 ```
+
+`manifest` 只发送顺序稳定的路径、类型与大小元数据。`bounded` 会在 `maxTotalBytes` 内加入可读的 UTF-8 内容，并汇总报告超限、二进制、不可读和触发总预算的遗漏项；取消操作仍会立即终止。
+
+文本文件的 `maxFileBytes` 可以调整，但提高它不会增加 PDF 支持。PDF 和其他二进制文档需先转换为 `.txt` 或 `.md`，插件现在会在报错中明确给出这个处理方式。
 
 ## 对模型的影响
 
 | 方面 | 效果 |
 | --- | --- |
-| Token 开销 | 每个附加文件把完整内容（不超过 `maxFileBytes`）加入请求；目录则逐个加入其下文件。 |
-| 工具调用 | 无 —— 内容已在提示词中，模型无需再调用工具读取。 |
-| 消息格式 | 文件序列化为 `<file path="<工作区相对路径>">\n<内容>\n</file>`，目录为 `<directory path="…">…</directory>`；以来源 `at-file-mention` 的用户消息注入。 |
-| 边界 | 超过 `maxFileBytes`、二进制文件、或越出工作区的路径被跳过（提及保持普通文本）。 |
+| Token 开销 | 直接文件加入不超过 `maxFileBytes` 的完整文本；目录默认只加入受 `maxTotalBytes` 限制的紧凑清单。 |
+| 工具调用 | 直接文件无需读取工具；目录清单让模型通过常规工作区工具只搜索、读取需要的文件。 |
+| 消息格式 | 文件使用 `<file path="…">`；清单使用 `<entry path="…" type="…" size="…" />`；bounded 模式另含 `<omitted>` 行及计数/字节属性。 |
+| 边界 | 直接提及超限、PDF 或二进制文件时给出可操作报错；bounded 目录逐个跳过不支持的后代并报告截断，不再中止整个用户回合。 |
 
 ## 权限边界
 
