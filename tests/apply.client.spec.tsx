@@ -54,6 +54,10 @@ interface BootOptions {
 async function boot(options: BootOptions = {}) {
   const ctx = new Context()
   const registerSource = vi.fn(() => () => {})
+  const controller = { menu: { getSnapshot: vi.fn(), subscribe: vi.fn() }, track: vi.fn() }
+  const sessionOf = vi.fn(() => controller)
+  const sessionScope = {}
+  const scopeSession = vi.fn(() => sessionScope)
   const mount = vi.fn(async () => () => {})
   const localeRegister = vi.fn(() => () => {})
   const bind = vi.fn(() => (key: string, params?: Record<string, string>) => (params?.message ? `${key}: ${params.message}` : key))
@@ -61,7 +65,7 @@ async function boot(options: BootOptions = {}) {
   const slotsInject = vi.fn((_name: string, factory: () => void) => { factory() })
   const openPath = vi.fn(options.openPath ?? (async () => ({ result: { ok: true as const } })))
   const { scope, setValue, clearValue } = scopeStub(options.enabled ?? true)
-  ctx.provide('inputTriggers', { registerSource })
+  ctx.provide('inputTriggers', { registerSource, sessionOf })
   ctx.provide('connection', { api: { host: { openPath } } })
   ctx.provide('remote', { $mount: mount })
   if (options.withoutNamespace !== true) {
@@ -72,12 +76,15 @@ async function boot(options: BootOptions = {}) {
   ctx.provide('settingsScope', { bind: () => scope })
   ctx.provide('slots', { inject: slotsInject, register: slotsRegister })
   ctx.provide('locale', { register: localeRegister, bind })
-  ctx.provide('sessions', {})
+  ctx.provide('sessions', { scope: scopeSession })
   apply(ctx as unknown as Parameters<typeof apply>[0])
   // The Remote mount effect is asynchronous; settle one tick.
   await Promise.resolve()
   await Promise.resolve()
-  return { ctx, registerSource, mount, localeRegister, bind, slotsRegister, slotsInject, openPath, setValue, clearValue, scope }
+  return {
+    ctx, registerSource, sessionOf, sessionScope, scopeSession, mount, localeRegister, bind,
+    slotsRegister, slotsInject, openPath, setValue, clearValue, scope,
+  }
 }
 
 /** One registered trigger source, narrowed to the members the assertions read. */
@@ -175,6 +182,28 @@ describe('dsh-at-file client apply', () => {
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     dock.inject('s1').onOpen('a.ts')
     expect(booted.openPath).toHaveBeenCalledWith({ path: '/ws/a.ts' })
+  })
+
+  it('registers directory navigation against the current session controller', async () => {
+    const booted = await boot()
+    const navigator = booted.slotsRegister.mock.calls.find(call => call[0]?.id === 'at-file-folder-navigation')?.[0] as {
+      name: string
+      order: number
+      inject: (sessionId: string) => { controller: unknown }
+    }
+    expect(navigator).toMatchObject({ name: 'conversation.input.overlay', order: 1 })
+    expect(navigator.inject('s1').controller).toBeDefined()
+    expect(booted.scopeSession).toHaveBeenCalledWith('s1')
+    expect(booted.sessionOf).toHaveBeenCalledWith(booted.sessionScope)
+  })
+
+  it('fails loud when directory navigation cannot resolve the session scope', async () => {
+    const booted = await boot()
+    booted.scopeSession.mockReturnValueOnce(undefined)
+    const navigator = booted.slotsRegister.mock.calls.find(call => call[0]?.id === 'at-file-folder-navigation')?.[0] as {
+      inject: (sessionId: string) => unknown
+    }
+    expect(() => navigator.inject('missing')).toThrow(/session "missing" has no client scope/)
   })
 
   it('registers the settings section whose toggle writes the scope', async () => {

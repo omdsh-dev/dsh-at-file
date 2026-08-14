@@ -37,11 +37,18 @@ function byDefault(a: FileEntry, b: FileEntry): number {
 
 /** Match one normalized query against a basename or an ordered path segment list. */
 function scorePath(path: string, q: string): number {
-  const pathSegments = path.toLowerCase().split('/')
+  const lowerPath = path.toLowerCase()
+  const pathSegments = lowerPath.split('/')
   const normalizedQuery = q.replaceAll('\\', '/')
   const querySegments = normalizedQuery.split('/').filter(Boolean)
   if (!normalizedQuery.includes('/')) return scoreName(pathSegments.at(-1) as string, querySegments[0] as string)
   if (querySegments.length === 0) return -1
+  if (normalizedQuery.endsWith('/')) {
+    const prefix = normalizedQuery.slice(0, -1)
+    if (!lowerPath.startsWith(`${prefix}/`)) return -1
+    const depth = lowerPath.slice(prefix.length + 1).split('/').length
+    return 6000 - (depth - 1) * 100 - path.length
+  }
 
   let cursor = 0
   let total = 0

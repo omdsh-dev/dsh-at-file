@@ -9,7 +9,7 @@
 // Type-only: the ctx.remote merge and the forwarded Host-event face.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, ISessions } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InputTriggerServiceContract } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 // Type-only: the conversation SlotMap / standard-kit merges for the dock seat.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -25,6 +25,7 @@ import { FilesDock, type AtFileDockInjected } from './FilesDock.tsx'
 import { AtFileSection, type AtFileSectionInjected } from './SettingsSection.tsx'
 import { NS, en, zh } from './locales.ts'
 import { adoptStyles } from './styles.ts'
+import { FolderNavigator, type FolderNavigatorInjected } from './FolderNavigator.tsx'
 
 /** Required services: picker pipeline, session projection, carrier, Remote face, slots, locale, settings scope. */
 export const inject = ['inputTriggers', 'sessions', 'connection', 'remote', 'slots', 'locale', 'settingsScope']
@@ -63,6 +64,7 @@ export function apply(ctx: ClientContext): void {
 
   const connection = ctx.get('connection') as ConnectionHandle
   const inputTriggers = ctx.get('inputTriggers') as InputTriggerServiceContract
+  const sessions = ctx.get('sessions') as unknown as ISessions
   const t = ctx.locale.bind(NS)
   const scope = ctx.settingsScope.bind<AtFileSettings>({ namespace: 'at-file' })
 
@@ -142,6 +144,17 @@ export function apply(ctx: ClientContext): void {
       hooks: { scope },
     }),
   }, FilesDock))
+
+  ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
+    name: 'conversation.input.overlay',
+    id: 'at-file-folder-navigation',
+    order: 1,
+    inject: (sessionId): FolderNavigatorInjected => {
+      const actx = sessions.scope(sessionId)
+      if (actx === undefined) throw new Error(`dsh-at-file: session "${String(sessionId)}" has no client scope`)
+      return { controller: inputTriggers.sessionOf(actx) }
+    },
+  }, FolderNavigator))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

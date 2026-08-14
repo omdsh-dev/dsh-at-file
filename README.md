@@ -30,6 +30,8 @@ Plain queries match filenames. Exact names, prefixes, and compact matches rank a
 
 A query containing `/` matches path segments in order. For example, `src/view` can find `src/client/view.ts`. A trailing slash such as `src/` searches within that path.
 
+When a directory is highlighted, press `ArrowRight` to enter it. The draft advances to `@path/` without a trailing space, and the candidate menu stays open for the next selection. `Enter` and pointer selection keep the existing behavior and finish the directory reference.
+
 Each result shows the filename first and its parent directory underneath. Duplicate filenames include the parent directory in the main label. Built-in SVG icons distinguish folders, source files, text, PDFs, images, data and configuration files, archives, and other files.
 
 The default index skips common version-control directories, IDE metadata, dependency trees, caches, and build output. The list covers VS Code, Visual Studio, JetBrains IDEs, Fleet, Eclipse, Android and Gradle, Xcode, CMake, Flutter, .NET, Unity, Unreal, and common JavaScript and Python output directories.
@@ -37,10 +39,10 @@ The default index skips common version-control directories, IDE metadata, depend
 ## Install or Update
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.3.1.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.4.0.tar.gz
 ```
 
-Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.3.1`.
+Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.4.0`.
 
 The plugin can be enabled or disabled under **Settings -> File mentions**.
 

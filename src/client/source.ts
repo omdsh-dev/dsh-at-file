@@ -18,6 +18,8 @@ declare module '@deepseek-ai/dsh-client-ui-input-trigger/client' {
   interface InputTriggerCandidate {
     /** Source-owned stable value when the visible name is only a display label. */
     readonly value?: string
+    /** Indexed path kind used by source-owned keyboard navigation. */
+    readonly atFileKind?: FileEntry['kind']
   }
 }
 
@@ -74,6 +76,7 @@ function candidateRows(files: readonly FileEntry[]): readonly AtFileCandidate[] 
     return {
       name: duplicate && directory !== '' ? `${basename} - ${directory}` : basename,
       value: file.relative,
+      atFileKind: file.kind,
       // The standing contract types icons as text. React renders this in-memory
       // element directly; no icon markup crosses the Host boundary.
       icon: fileIcon(file) as unknown as string,

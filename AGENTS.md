@@ -20,6 +20,7 @@ src/client/         browser half, served as the single file /plugins/dsh-at-file
   source.ts         InputTriggerSource factory (per-session index cache, plain-text @path picks)
   search.ts         filename ranking, ordered path-segment queries, and dirs-first default browsing
   icons.tsx         built-in SVG icons selected from the indexed path type and extension
+  FolderNavigator.tsx  ArrowRight directory traversal that keeps the @ candidate menu active
   FilesDock.tsx     input.dock rows parsed from the draft's @path tokens (open/remove)
   SettingsSection.tsx  one labeled native enable checkbox over the settings scope
 tests/              node-env specs; jsdom pragma on the browser specs

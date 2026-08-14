@@ -14,6 +14,8 @@ declare module '@deepseek-ai/dsh-client-ui-input-trigger/client' {
     interface InputTriggerCandidate {
         /** Source-owned stable value when the visible name is only a display label. */
         readonly value?: string;
+        /** Indexed path kind used by source-owned keyboard navigation. */
+        readonly atFileKind?: FileEntry['kind'];
     }
 }
 /** Owner source name (the lexicon and decoration routing key). */

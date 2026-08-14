@@ -41,7 +41,7 @@ describe('@file candidates', () => {
   it('shows the basename first while retaining the full relative path as its value', async () => {
     const { source } = harness()
     const rows = await source.candidates(session('s1'), { query: 'view', position: 'inline', signal: new AbortController().signal })
-    expect(rows[0]).toMatchObject({ name: 'view.ts', value: 'src/client/view.ts', description: 'src/client' })
+    expect(rows[0]).toMatchObject({ name: 'view.ts', value: 'src/client/view.ts', atFileKind: 'file', description: 'src/client' })
     expect(fileIconKind(FILES[3]!)).toBe('code')
   })
 
@@ -49,7 +49,7 @@ describe('@file candidates', () => {
     const { source } = harness()
     const rows = await source.candidates(session('s1'), { query: 'src', position: 'inline', signal: new AbortController().signal })
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ name: 'src', value: 'src' })
+    expect(rows[0]).toMatchObject({ name: 'src', value: 'src', atFileKind: 'dir' })
     expect(rows[0]!.description).toBeUndefined()
   })
 

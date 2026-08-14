@@ -56,10 +56,11 @@ describe('rankFiles', () => {
     ])
     expect(rankFiles(FILES, 'src\\in', 1)).toEqual([entry('src/index.ts')])
     expect(rankFiles(FILES, 'src/', 3)).toEqual([
-      entry('src', 'dir'),
       entry('src/index.ts'),
       entry('src/lint/run.ts'),
+      entry('src/lint/check.ts'),
     ])
+    expect(rankFiles(FILES, 'missing/', 3)).toEqual([])
   })
 
   it('returns only the files the query matches', () => {
