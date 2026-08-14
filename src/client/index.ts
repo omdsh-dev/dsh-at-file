@@ -26,6 +26,7 @@ import { AtFileSection, type AtFileSectionInjected } from './SettingsSection.tsx
 import { NS, en, zh } from './locales.ts'
 import { adoptStyles } from './styles.ts'
 import { FolderNavigator, type FolderNavigatorInjected } from './FolderNavigator.tsx'
+import { DEFAULT_IGNORE_FILES, normalizeIgnoreFiles } from '../defaults.ts'
 
 /** Required services: picker pipeline, session projection, carrier, Remote face, slots, locale, settings scope. */
 export const inject = ['inputTriggers', 'sessions', 'connection', 'remote', 'slots', 'locale', 'settingsScope']
@@ -90,8 +91,16 @@ export function apply(ctx: ClientContext): void {
   // the schema default is enabled) and unregisters the moment it flips off.
   let sourceRegistered = false
   let sourceDispose = (): void => {}
+  let ignoreFilesKey: string | undefined
   const syncSource = (): void => {
-    const enabled = scope.getSnapshot().value?.enabled ?? true
+    const value = scope.getSnapshot().value
+    const enabled = value?.enabled ?? true
+    const nextIgnoreFilesKey = normalizeIgnoreFiles(value?.ignoreFiles ?? DEFAULT_IGNORE_FILES).join('\n').toLowerCase()
+    if (ignoreFilesKey !== undefined && ignoreFilesKey !== nextIgnoreFilesKey) {
+      invalidateAll()
+      entryByRel.clear()
+    }
+    ignoreFilesKey = nextIgnoreFilesKey
     if (enabled && !sourceRegistered) {
       sourceDispose = inputTriggers.registerSource(source)
       sourceRegistered = true
@@ -165,6 +174,7 @@ export function apply(ctx: ClientContext): void {
     inject: (): AtFileSectionInjected => ({
       hooks: { scope },
       setEnabled: async (enabled: boolean) => { await scope.set('enabled', enabled) },
+      setIgnoreFiles: async (ignoreFiles: readonly string[]) => { await scope.set('ignoreFiles', [...ignoreFiles]) },
     }),
   }, AtFileSection))
 }

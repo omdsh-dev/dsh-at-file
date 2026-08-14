@@ -13,12 +13,14 @@ import { AT_FILE_REMOTE } from '../src/client/remote.ts'
 import { NS, en, zh } from '../src/client/locales.ts'
 import { SOURCE_NAME } from '../src/client/source.ts'
 import { STYLE_ID } from '../src/client/styles.ts'
+import { DEFAULT_IGNORE_FILES } from '../src/defaults.ts'
+import type { AtFileSettings } from '../src/contract.ts'
 
 type RemoteResult<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string; details: object } }
 
 /** A settings scope stub with switchable value + recorded writes. */
-function scopeStub(initial: boolean) {
-  let value: { enabled: boolean } | undefined = { enabled: initial }
+function scopeStub(initial: boolean, initialIgnoreFiles: readonly string[] = DEFAULT_IGNORE_FILES) {
+  let value: AtFileSettings | undefined = { enabled: initial, ignoreFiles: [...initialIgnoreFiles] }
   const listeners = new Set<() => void>()
   return {
     scope: {
@@ -27,13 +29,20 @@ function scopeStub(initial: boolean) {
         listeners.add(listener)
         return () => { listeners.delete(listener) }
       },
-      set: vi.fn(async (_field: string, next: boolean) => {
-        value = { enabled: next }
+      set: vi.fn(async (field: string, next: boolean | readonly string[]) => {
+        const current = value ?? { enabled: true, ignoreFiles: [...DEFAULT_IGNORE_FILES] }
+        value = field === 'enabled'
+          ? { ...current, enabled: next as boolean }
+          : { ...current, ignoreFiles: [...next as readonly string[]] }
         for (const listener of listeners) listener()
       }),
     },
     setValue: (next: boolean) => {
-      value = { enabled: next }
+      value = { ...(value ?? { ignoreFiles: [...DEFAULT_IGNORE_FILES] }), enabled: next }
+      for (const listener of listeners) listener()
+    },
+    setIgnoreFilesValue: (next: readonly string[]) => {
+      value = { ...(value ?? { enabled: true }), ignoreFiles: [...next] }
       for (const listener of listeners) listener()
     },
     clearValue: () => {
@@ -47,6 +56,7 @@ interface BootOptions {
   atFileSearch?: (sessionId: SessionId, signal: AbortSignal) => Promise<RemoteResult<readonly { path: string; relative: string; kind: 'file' | 'dir' }[]>>
   openPath?: () => Promise<{ result: { ok: true } | { ok: false; error: { message: string } } }>
   enabled?: boolean
+  ignoreFiles?: readonly string[]
   withoutNamespace?: boolean
 }
 
@@ -64,7 +74,7 @@ async function boot(options: BootOptions = {}) {
   const slotsRegister = vi.fn()
   const slotsInject = vi.fn((_name: string, factory: () => void) => { factory() })
   const openPath = vi.fn(options.openPath ?? (async () => ({ result: { ok: true as const } })))
-  const { scope, setValue, clearValue } = scopeStub(options.enabled ?? true)
+  const { scope, setValue, setIgnoreFilesValue, clearValue } = scopeStub(options.enabled ?? true, options.ignoreFiles)
   ctx.provide('inputTriggers', { registerSource, sessionOf })
   ctx.provide('connection', { api: { host: { openPath } } })
   ctx.provide('remote', { $mount: mount })
@@ -83,7 +93,7 @@ async function boot(options: BootOptions = {}) {
   await Promise.resolve()
   return {
     ctx, registerSource, sessionOf, sessionScope, scopeSession, mount, localeRegister, bind,
-    slotsRegister, slotsInject, openPath, setValue, clearValue, scope,
+    slotsRegister, slotsInject, openPath, setValue, setIgnoreFilesValue, clearValue, scope,
   }
 }
 
@@ -213,12 +223,17 @@ describe('dsh-at-file client apply', () => {
       order: number
       label: () => string
       locale: string
-      inject: () => { setEnabled: (enabled: boolean) => Promise<void> }
+      inject: () => {
+        setEnabled: (enabled: boolean) => Promise<void>
+        setIgnoreFiles: (ignoreFiles: readonly string[]) => Promise<void>
+      }
     }
     expect(section).toMatchObject({ id: 'at-file', order: 55, locale: NS })
     expect(section.label()).toBe('nav')
     await section.inject().setEnabled(false)
     expect(scope.set).toHaveBeenCalledWith('enabled', false)
+    await section.inject().setIgnoreFiles(['desktop.ini'])
+    expect(scope.set).toHaveBeenCalledWith('ignoreFiles', ['desktop.ini'])
   })
 
   it('logs failed host opens', async () => {
@@ -269,6 +284,16 @@ describe('dsh-at-file client apply', () => {
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     expect(atFileSearch).toHaveBeenCalledTimes(1)
     booted.ctx.emit('connection/reset')
+    await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
+    expect(atFileSearch).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears cached indexes when the file filters change', async () => {
+    const atFileSearch = vi.fn(async () => ({ ok: true as const, value: [{ path: '/ws/a.ts', relative: 'a.ts', kind: 'file' }] }))
+    const booted = await boot({ atFileSearch })
+    await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
+    expect(atFileSearch).toHaveBeenCalledTimes(1)
+    booted.setIgnoreFilesValue(['desktop.ini'])
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     expect(atFileSearch).toHaveBeenCalledTimes(2)
   })

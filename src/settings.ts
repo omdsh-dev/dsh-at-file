@@ -1,13 +1,14 @@
 /**
- * The `at-file` settings namespace: the durable enable switch every
- * deployment can turn off from the Web settings page. Registered with the
- * settings provider at plugin load; the runtime reads the owner scope's live
- * value on every call, so a toggle takes effect without a restart.
+ * The `at-file` settings namespace: the durable enable switch and file-name
+ * filters managed from the Web settings page. Registered with the settings
+ * provider at plugin load; the runtime reads the owner scope's live value on
+ * every call, so changes take effect without a restart.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { settingsNamespace, type SettingsScope } from '@deepseek-ai/dsh-settings'
 import type { AtFileSettings } from './contract.ts'
+import { DEFAULT_IGNORE_FILES } from './defaults.ts'
 
 /** The branded namespace name (the Web allowlist must list the same string). */
 export const AT_FILE_NAMESPACE = settingsNamespace('at-file')
@@ -15,6 +16,7 @@ export const AT_FILE_NAMESPACE = settingsNamespace('at-file')
 /** Schemastery schema of the `at-file` namespace section. */
 export const AtFileSettingsSchema: z<AtFileSettings> = z.object({
   enabled: z.boolean().default(true),
+  ignoreFiles: z.array(z.string()).default([...DEFAULT_IGNORE_FILES]),
 })
 
 /**

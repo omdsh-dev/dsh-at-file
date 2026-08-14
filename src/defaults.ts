@@ -61,3 +61,24 @@ export const DEFAULT_IGNORE_DIRS = [
   'Saved',
   'DerivedDataCache',
 ] as const
+
+/** File basenames omitted from the picker unless the Web setting replaces the list. */
+export const DEFAULT_IGNORE_FILES = [
+  'desktop.ini',
+  'Thumbs.db',
+  '.DS_Store',
+] as const
+
+/** Trim file basenames and remove empty or case-insensitive duplicate entries. */
+export function normalizeIgnoreFiles(values: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+  for (const value of values) {
+    const name = value.trim()
+    const key = name.toLowerCase()
+    if (name === '' || seen.has(key)) continue
+    seen.add(key)
+    normalized.push(name)
+  }
+  return normalized
+}

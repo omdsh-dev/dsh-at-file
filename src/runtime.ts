@@ -11,7 +11,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { indexWorkspace } from './files.ts'
-import type { FileEntry } from './contract.ts'
+import type { AtFileSettings, FileEntry } from './contract.ts'
 import type { ResolvedConfig } from './types.ts'
 
 /** At-file workspace service: search the cwd index for the browser picker. */
@@ -25,7 +25,7 @@ export class AtFileRuntime extends TypertRemoteService {
   constructor(
     ctx: Context,
     private readonly config: ResolvedConfig,
-    private readonly isEnabled: () => boolean,
+    private readonly getSettings: () => AtFileSettings,
   ) {
     super(ctx, 'atFile')
   }
@@ -40,7 +40,8 @@ export class AtFileRuntime extends TypertRemoteService {
    */
   @Remote
   async search(agent: Agent, signal: AbortSignal): Promise<readonly FileEntry[]> {
-    if (!this.isEnabled()) {
+    const settings = this.getSettings()
+    if (!settings.enabled) {
       throw new Error('at-file is disabled in Settings')
     }
     const cwd = agent.session.header.cwd
@@ -50,6 +51,7 @@ export class AtFileRuntime extends TypertRemoteService {
     const index = await indexWorkspace(cwd, {
       maxFiles: this.config.maxIndexedFiles,
       ignoreDirs: this.config.ignoreDirs,
+      ignoreFiles: settings.ignoreFiles,
     }, signal)
     return index.files
   }

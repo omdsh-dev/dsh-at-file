@@ -22,7 +22,7 @@ src/client/         browser half, served as the single file /plugins/dsh-at-file
   icons.tsx         built-in SVG icons selected from the indexed path type and extension
   FolderNavigator.tsx  ArrowRight directory traversal that keeps the @ candidate menu active
   FilesDock.tsx     input.dock rows parsed from the draft's @path tokens (open/remove)
-  SettingsSection.tsx  one labeled native enable checkbox over the settings scope
+  SettingsSection.tsx  native enable checkbox plus exact-basename filter editor
 tests/              node-env specs; jsdom pragma on the browser specs
 ```
 

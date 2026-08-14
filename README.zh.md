@@ -34,17 +34,17 @@ DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `
 
 候选项优先显示文件名，下方显示父目录。遇到重名文件时，父目录也会写入主标题。内置 SVG 图标可区分目录、源代码、文本、PDF、图片、数据与配置、压缩包以及其他文件。
 
-默认索引会跳过常见的版本控制目录、IDE 元数据、依赖目录、缓存和构建产物。目前涵盖 VS Code、Visual Studio、JetBrains IDE、Fleet、Eclipse、Android 与 Gradle、Xcode、CMake、Flutter、.NET、Unity、Unreal，以及常见的 JavaScript 和 Python 输出目录。
+默认索引会跳过常见的版本控制目录、IDE 元数据、依赖目录、缓存和构建产物。目前涵盖 VS Code、Visual Studio、JetBrains IDE、Fleet、Eclipse、Android 与 Gradle、Xcode、CMake、Flutter、.NET、Unity、Unreal，以及常见的 JavaScript 和 Python 输出目录。`desktop.ini`、`Thumbs.db` 和 `.DS_Store` 这类系统元数据文件也会默认排除。
 
 ## 安装或更新
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.4.0.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.4.1.tar.gz
 ```
 
-已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.4.0`。
+已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.4.1`。
 
-插件开关位于 **设置 -> 文件提及**。
+插件开关位于 **设置 -> 文件提及**。同一页面可以编辑忽略文件名列表，每行填写一个完整文件名，匹配时不区分大小写。保存后会清除已有索引缓存，下一次输入 `@` 时直接使用新设置，无需重启 DSH。清空列表即可取消文件名过滤。
 
 ## 配置
 
@@ -66,6 +66,7 @@ dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/re
 ## 路径处理
 
 - 选择器索引当前工作区中的常规文件和目录，并跳过已配置的目录名与符号链接。
+- 文件名过滤在 Host 遍历工作区时执行，被过滤的条目不会占用 `maxIndexedFiles`，也不会发送到浏览器。
 - Host 接受工作区相对路径。绝对路径以及越出工作区的路径会被忽略。
 - 只有用户输入的文本可以生成引用消息。
 - 点击引用路径时会调用 Harness 的 `host.openPath` 端点。

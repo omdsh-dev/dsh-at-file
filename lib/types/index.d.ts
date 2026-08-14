@@ -13,7 +13,7 @@ import z from '@deepseek-ai/schemastery';
 export declare const name = "dsh-at-file";
 /** Services required before load: the Typert registry, the settings provider, and the agent registry. */
 export declare const inject: string[];
-export { DEFAULT_IGNORE_DIRS } from './defaults.ts';
+export { DEFAULT_IGNORE_DIRS, DEFAULT_IGNORE_FILES } from './defaults.ts';
 /** Host plugin configuration, validated at load by the Loader. */
 export interface Config {
     /** Hard cap on indexed files per workspace; the walk stops and reports truncation. */

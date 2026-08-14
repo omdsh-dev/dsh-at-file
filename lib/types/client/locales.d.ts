@@ -11,6 +11,11 @@ export declare const zh: {
     'settings.subtitle': string;
     'settings.enabled': string;
     'settings.enabledDesc': string;
+    'settings.ignoreFiles': string;
+    'settings.ignoreFilesDesc': string;
+    'settings.ignoreFilesHint': string;
+    'settings.save': string;
+    'settings.saving': string;
 };
 /** The `at-file` namespace key union. */
 export type AtFileKey = keyof typeof zh;
@@ -23,6 +28,11 @@ export declare const en: {
     'settings.subtitle': string;
     'settings.enabled': string;
     'settings.enabledDesc': string;
+    'settings.ignoreFiles': string;
+    'settings.ignoreFilesDesc': string;
+    'settings.ignoreFilesHint': string;
+    'settings.save': string;
+    'settings.saving': string;
 };
 /** Locale namespace id registered under ctx.locale. */
 export declare const NS = "at-file";

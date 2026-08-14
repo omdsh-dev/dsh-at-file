@@ -5,6 +5,8 @@ export interface IndexOptions {
     readonly maxFiles: number;
     /** Directory basenames the walk skips (children never enqueue). */
     readonly ignoreDirs: readonly string[];
+    /** File basenames omitted from the index, matched case-insensitively. */
+    readonly ignoreFiles: readonly string[];
 }
 /** One index pass result: the sorted file list plus the honest truncation flag. */
 export interface WorkspaceIndex {

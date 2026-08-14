@@ -17,6 +17,8 @@ export interface FileEntry {
 export interface AtFileSettings {
     /** Whether the @file surface is enabled; false hides picker, dock, and reference injection. */
     readonly enabled: boolean;
+    /** File basenames excluded from workspace indexes, matched case-insensitively. */
+    readonly ignoreFiles: string[];
 }
 /** Wire codec: one session identity (branded string on the wire). */
 export declare const sessionIdSchema: z.ZodString;

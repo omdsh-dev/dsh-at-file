@@ -10,19 +10,19 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import type { Agent } from '@deepseek-ai/dsh-agent';
-import type { FileEntry } from './contract.ts';
+import type { AtFileSettings, FileEntry } from './contract.ts';
 import type { ResolvedConfig } from './types.ts';
 /** At-file workspace service: search the cwd index for the browser picker. */
 export declare class AtFileRuntime extends TypertRemoteService {
     private readonly config;
-    private readonly isEnabled;
+    private readonly getSettings;
     /**
      * Register the service under the `atFile` key (the wire namespace).
      * @param ctx - owning cordis context.
      * @param config - resolved plugin configuration.
      * @param isEnabled - live settings read; false refuses the endpoint.
      */
-    constructor(ctx: Context, config: ResolvedConfig, isEnabled: () => boolean);
+    constructor(ctx: Context, config: ResolvedConfig, getSettings: () => AtFileSettings);
     /**
      * Index the addressed agent's workspace and return the bounded entry list.
      * The client caches the list per session and filters per keystroke.

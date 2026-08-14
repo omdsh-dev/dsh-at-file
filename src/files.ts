@@ -8,6 +8,7 @@ import { opendir } from 'node:fs/promises'
 import type { Dir } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import type { FileEntry } from './contract.ts'
+import { normalizeIgnoreFiles } from './defaults.ts'
 
 /** Options for one bounded index pass. */
 export interface IndexOptions {
@@ -15,6 +16,8 @@ export interface IndexOptions {
   readonly maxFiles: number
   /** Directory basenames the walk skips (children never enqueue). */
   readonly ignoreDirs: readonly string[]
+  /** File basenames omitted from the index, matched case-insensitively. */
+  readonly ignoreFiles: readonly string[]
 }
 
 /** One index pass result: the sorted file list plus the honest truncation flag. */
@@ -98,7 +101,8 @@ export async function indexWorkspace(
   options: IndexOptions,
   signal?: AbortSignal,
 ): Promise<WorkspaceIndex> {
-  const ignore = new Set(options.ignoreDirs)
+  const ignoreDirs = new Set(options.ignoreDirs)
+  const ignoreFiles = new Set(normalizeIgnoreFiles(options.ignoreFiles).map(name => name.toLowerCase()))
   const files: FileEntry[] = []
   const queue: string[] = [root]
   let truncated = false
@@ -126,14 +130,16 @@ export async function indexWorkspace(
         if (dirent.isSymbolicLink()) continue
         const child = join(dir, dirent.name)
         if (dirent.isDirectory()) {
-          if (ignore.has(dirent.name)) continue
+          if (ignoreDirs.has(dirent.name)) continue
           // Directories are indexed entries too, so the picker can reference
           // one path without inspecting its descendants at send time.
           files.push({ path: child, relative: displayRelative(root, child), kind: 'dir' })
           queue.push(child)
           continue
         }
-        if (dirent.isFile()) files.push({ path: child, relative: displayRelative(root, child), kind: 'file' })
+        if (dirent.isFile() && !ignoreFiles.has(dirent.name.toLowerCase())) {
+          files.push({ path: child, relative: displayRelative(root, child), kind: 'file' })
+        }
       }
     } finally {
       await closeOrSwallow(handle, signal)

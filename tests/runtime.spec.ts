@@ -16,6 +16,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import * as plugin from '../src/index.ts'
 import type { AtFileRuntime } from '../src/runtime.ts'
+import type { AtFileSettings } from '../src/contract.ts'
 
 /** One structural Agent stub: only the session header the service reads. */
 function agentWith(cwd: string | undefined): Agent {
@@ -28,11 +29,11 @@ function originalOf(service: object): object {
   return original ?? service
 }
 
-/** A settings provider stub whose `enabled` value is switchable per test. */
-function settingsProvider(enabled: () => boolean) {
+/** A settings provider stub whose value is switchable per test. */
+function settingsProvider(read: () => AtFileSettings) {
   return {
     register: () => ({
-      get: () => ({ enabled: enabled() }),
+      get: read,
       watch: () => () => {},
       update: async () => {},
       replace: async () => {},
@@ -41,10 +42,14 @@ function settingsProvider(enabled: () => boolean) {
 }
 
 /** Mount the function-plugin module on a fresh context (harness test pattern). */
-async function mount(ctx: Context, config?: plugin.Config, enabled: () => boolean = () => true) {
+async function mount(
+  ctx: Context,
+  config?: plugin.Config,
+  readSettings: () => AtFileSettings = () => ({ enabled: true, ignoreFiles: [...plugin.DEFAULT_IGNORE_FILES] }),
+) {
   const registryFiber = ctx.plugin(TypertRegistry)
   await registryFiber
-  ctx.provide('settings', settingsProvider(enabled))
+  ctx.provide('settings', settingsProvider(readSettings))
   ctx.provide('agents', { roots: () => [] })
   const fiber = ctx.plugin({ inject: plugin.inject, apply: plugin.apply }, config)
   await fiber
@@ -123,11 +128,29 @@ describe('dsh-at-file host composition', () => {
   it('search refuses while the settings switch is off', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-runtime-'))
     const ctx = new Context()
-    const fiber = await mount(ctx, undefined, () => false)
+    const fiber = await mount(ctx, undefined, () => ({ enabled: false, ignoreFiles: [...plugin.DEFAULT_IGNORE_FILES] }))
     try {
       const runtime = ctx.get('atFile') as AtFileRuntime
       await expect(runtime.search(agentWith(root), new AbortController().signal))
         .rejects.toThrow(/disabled in Settings/)
+    } finally {
+      await fiber.dispose()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('search applies the live case-insensitive file-name filters', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-runtime-'))
+    await writeFile(join(root, 'desktop.ini'), 'metadata\n')
+    await writeFile(join(root, 'keep.txt'), 'keep\n')
+    let ignoreFiles: string[] = ['DESKTOP.INI']
+    const ctx = new Context()
+    const fiber = await mount(ctx, undefined, () => ({ enabled: true, ignoreFiles }))
+    try {
+      const runtime = ctx.get('atFile') as AtFileRuntime
+      expect((await runtime.search(agentWith(root), new AbortController().signal)).map(file => file.relative)).toEqual(['keep.txt'])
+      ignoreFiles = []
+      expect((await runtime.search(agentWith(root), new AbortController().signal)).map(file => file.relative)).toEqual(['desktop.ini', 'keep.txt'])
     } finally {
       await fiber.dispose()
       await rm(root, { recursive: true, force: true })
@@ -139,6 +162,7 @@ describe('dsh-at-file host composition', () => {
       maxIndexedFiles: 5000,
       ignoreDirs: [...plugin.DEFAULT_IGNORE_DIRS],
     })
+    expect(plugin.DEFAULT_IGNORE_FILES).toEqual(['desktop.ini', 'Thumbs.db', '.DS_Store'])
     expect(plugin.Config({ ignoreDirs: [] }).ignoreDirs).toEqual([])
     expect(() => plugin.Config({ maxIndexedFiles: 0 })).toThrow()
   })

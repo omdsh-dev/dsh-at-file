@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { indexWorkspace } from '../src/files.ts'
-import { DEFAULT_IGNORE_DIRS } from '../src/defaults.ts'
+import { DEFAULT_IGNORE_DIRS, DEFAULT_IGNORE_FILES } from '../src/defaults.ts'
 
 /** Build a fresh fixture tree and hand back its root (caller removes it). */
 async function fixture(): Promise<string> {
@@ -30,7 +30,7 @@ describe('indexWorkspace', () => {
   it('collects file and directory paths without inspecting file content', async () => {
     const root = await fixture()
     try {
-      const { files, truncated } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: ['.git', 'node_modules'] })
+      const { files, truncated } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: ['.git', 'node_modules'], ignoreFiles: [] })
       expect(truncated).toBe(false)
       expect(files.map(file => `${file.kind}:${file.relative}`)).toEqual([
         'file:README.md',
@@ -49,7 +49,7 @@ describe('indexWorkspace', () => {
   it('skips ignore dirs and symlinks', async () => {
     const root = await fixture()
     try {
-      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: ['.git', 'node_modules'] })
+      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: ['.git', 'node_modules'], ignoreFiles: [] })
       const relatives = files.map(file => file.relative)
       expect(relatives).toContain('src/index.ts')
       expect(relatives).toContain('data.bin')
@@ -75,7 +75,7 @@ describe('indexWorkspace', () => {
       await mkdir(join(root, 'src'), { recursive: true })
       await writeFile(join(root, 'src', 'main.kt'), 'fun main() {}\n')
 
-      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: DEFAULT_IGNORE_DIRS })
+      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: DEFAULT_IGNORE_DIRS, ignoreFiles: [] })
       const relatives = files.map(file => file.relative)
       expect(relatives).toContain('src/main.kt')
       for (const directory of ignored) {
@@ -89,7 +89,7 @@ describe('indexWorkspace', () => {
   it('carries the absolute path on every entry', async () => {
     const root = await fixture()
     try {
-      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: [] })
+      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: [], ignoreFiles: [] })
       expect(files.find(file => file.relative === 'README.md')?.path).toBe(join(root, 'README.md'))
     } finally {
       await rm(root, { recursive: true, force: true })
@@ -99,7 +99,7 @@ describe('indexWorkspace', () => {
   it('stops at the entry cap and reports truncation honestly', async () => {
     const root = await fixture()
     try {
-      const { files, truncated } = await indexWorkspace(root, { maxFiles: 2, ignoreDirs: ['.git', 'node_modules'] })
+      const { files, truncated } = await indexWorkspace(root, { maxFiles: 2, ignoreDirs: ['.git', 'node_modules'], ignoreFiles: [] })
       expect(files).toHaveLength(2)
       expect(truncated).toBe(true)
     } finally {
@@ -110,7 +110,7 @@ describe('indexWorkspace', () => {
   it('rejects a missing root with a readable error', async () => {
     await expect(indexWorkspace(
       join(tmpdir(), 'dsh-at-file-missing-root'),
-      { maxFiles: 10, ignoreDirs: [] },
+      { maxFiles: 10, ignoreDirs: [], ignoreFiles: [] },
       new AbortController().signal,
     )).rejects.toThrow(/cannot list/)
   })
@@ -120,7 +120,7 @@ describe('indexWorkspace', () => {
     try {
       const controller = new AbortController()
       controller.abort(new Error('gone'))
-      await expect(indexWorkspace(root, { maxFiles: 10, ignoreDirs: [] }, controller.signal)).rejects.toThrow('gone')
+      await expect(indexWorkspace(root, { maxFiles: 10, ignoreDirs: [], ignoreFiles: [] }, controller.signal)).rejects.toThrow('gone')
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -131,7 +131,7 @@ describe('indexWorkspace', () => {
     try {
       const controller = new AbortController()
       controller.abort('plain reason')
-      await expect(indexWorkspace(root, { maxFiles: 10, ignoreDirs: [] }, controller.signal)).rejects.toThrow('plain reason')
+      await expect(indexWorkspace(root, { maxFiles: 10, ignoreDirs: [], ignoreFiles: [] }, controller.signal)).rejects.toThrow('plain reason')
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -143,8 +143,42 @@ describe('indexWorkspace', () => {
     const { execFileSync } = await import('node:child_process')
     execFileSync('mkfifo', [join(root, 'pipe')])
     try {
-      const { files } = await indexWorkspace(root, { maxFiles: 10, ignoreDirs: [] })
+      const { files } = await indexWorkspace(root, { maxFiles: 10, ignoreDirs: [], ignoreFiles: [] })
       expect(files).toEqual([])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('skips configured file basenames case-insensitively', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-file-ignore-'))
+    try {
+      await writeFile(join(root, 'desktop.ini'), 'metadata\n')
+      await writeFile(join(root, 'THUMBS.DB'), 'metadata\n')
+      await writeFile(join(root, '.DS_Store'), 'metadata\n')
+      await writeFile(join(root, 'keep.ini'), 'keep\n')
+      const { files } = await indexWorkspace(root, {
+        maxFiles: 100,
+        ignoreDirs: [],
+        ignoreFiles: DEFAULT_IGNORE_FILES,
+      })
+      expect(files.map(file => file.relative)).toEqual(['keep.ini'])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('normalizes empty and duplicate file filters without hiding other files', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-file-ignore-'))
+    try {
+      await writeFile(join(root, 'noise.log'), 'noise\n')
+      await writeFile(join(root, 'keep.log'), 'keep\n')
+      const { files } = await indexWorkspace(root, {
+        maxFiles: 100,
+        ignoreDirs: [],
+        ignoreFiles: [' noise.log ', 'NOISE.LOG', ''],
+      })
+      expect(files.map(file => file.relative)).toEqual(['keep.log'])
     } finally {
       await rm(root, { recursive: true, force: true })
     }

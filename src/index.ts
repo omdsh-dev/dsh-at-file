@@ -27,7 +27,7 @@ export const name = 'dsh-at-file'
 /** Services required before load: the Typert registry, the settings provider, and the agent registry. */
 export const inject = ['typert', 'settings', 'agents']
 
-export { DEFAULT_IGNORE_DIRS } from './defaults.ts'
+export { DEFAULT_IGNORE_DIRS, DEFAULT_IGNORE_FILES } from './defaults.ts'
 
 /** Host plugin configuration, validated at load by the Loader. */
 export interface Config {
@@ -58,8 +58,9 @@ export function apply(ctx: Context, config?: Config): void {
   // The durable enable switch: the runtime and the boundary read its live
   // value per call, so toggling it in the Web settings takes effect immediately.
   const settings = registerAtFileSettings(ctx)
-  const isEnabled = (): boolean => settings.get().enabled
-  new AtFileRuntime(ctx, resolved, isEnabled)
+  const getSettings = () => settings.get()
+  const isEnabled = (): boolean => getSettings().enabled
+  new AtFileRuntime(ctx, resolved, getSettings)
   // Strict endpoint registration: the gateway resolves atFile/search from
   // this manifest, independent of decorator marker state.
   ctx.effect(() => {
