@@ -1,12 +1,11 @@
 /**
- * `at-file` locale namespace: the attached-files dock copy and the submit-time
- * read-failure notice. Chinese is the product copy; English mirrors it.
+ * `at-file` locale namespace: referenced-path dock and settings copy.
+ * Chinese is the product copy; English mirrors it.
  */
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export declare const zh: {
     'dock.aria': string;
     'dock.remove': string;
-    'error.read': string;
     nav: string;
     'settings.title': string;
     'settings.subtitle': string;
@@ -19,7 +18,6 @@ export type AtFileKey = keyof typeof zh;
 export declare const en: {
     'dock.aria': string;
     'dock.remove': string;
-    'error.read': string;
     nav: string;
     'settings.title': string;
     'settings.subtitle': string;
@@ -37,7 +35,7 @@ export declare const NS = "at-file";
 export declare function fmt(template: string, params?: Record<string, string>): string;
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
-        /** The @file dock and failure copy. */
+        /** The @file reference and settings copy. */
         [NS]: AtFileKey;
     }
 }

@@ -4,8 +4,8 @@
  * discovery exports its @Remote methods to the Web client under
  * `/api/atFile/<method>` with zero generated artifacts: `search` takes the
  * resolved live Agent (the `agent` Typert lookup) and indexes its workspace.
- * File content never crosses this wire — the Host's pre-step boundary reads
- * it directly when the user mentions `@path`.
+ * File content never crosses this wire or the Host mention boundary; the
+ * plugin only indexes and marks user-selected paths.
  */
 import type { Context } from '@deepseek-ai/cordis';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';

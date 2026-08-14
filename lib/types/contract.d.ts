@@ -2,8 +2,8 @@
  * The atFile wire contract, shared verbatim by the host manifest
  * (`ctx.typert.register` in typert.ts) and the client contribution
  * (`ctx.remote.$mount` in client/remote.ts). The only Remote endpoint is the
- * workspace index search; file content reaches the model through the Host's
- * `agent/pre-step` boundary, not through a wire read.
+ * workspace index search. File bytes never cross this plugin boundary; the
+ * Host only marks validated user-selected paths at `agent/pre-step`.
  */
 import { z } from 'zod';
 import type { InvocationDescriptor } from '@deepseek-ai/dsh-typert-protocol';
@@ -13,60 +13,9 @@ export interface FileEntry {
     readonly relative: string;
     readonly kind: 'file' | 'dir';
 }
-/** One bounded text-file read (the Host mention expansion's file result). */
-export interface FileContent {
-    readonly content: string;
-    readonly bytes: number;
-}
-/** One file read inside a directory attachment. */
-export interface ReadTreeFile {
-    readonly path: string;
-    readonly relative: string;
-    readonly content: string;
-    readonly bytes: number;
-}
-/** How a directory mention is represented to the model. */
-export type DirectoryMode = 'manifest' | 'bounded';
-/** One metadata-only entry in a directory manifest. */
-export interface ReadTreeEntry {
-    readonly relative: string;
-    readonly kind: 'file' | 'dir';
-    /** Undefined when the entry disappeared or could not be stated. */
-    readonly bytes?: number;
-}
-/** Why one file was omitted from a bounded directory attachment. */
-export type ReadTreeSkipReason = 'oversized' | 'binary' | 'unreadable' | 'aggregate-limit';
-/** Structured metadata for one omitted directory descendant. */
-export type ReadTreeSkipped = {
-    readonly relative: string;
-    readonly reason: 'oversized';
-    readonly bytes: number;
-    readonly limit: number;
-} | {
-    readonly relative: string;
-    readonly reason: 'binary';
-    readonly bytes?: number;
-} | {
-    readonly relative: string;
-    readonly reason: 'unreadable';
-} | {
-    readonly relative: string;
-    readonly reason: 'aggregate-limit';
-    readonly bytes: number;
-    readonly limit: number;
-};
-/** One bounded directory read (the Host mention expansion's directory result). */
-export interface ReadTreeResult {
-    readonly mode: DirectoryMode;
-    readonly entries: readonly ReadTreeEntry[];
-    readonly files: readonly ReadTreeFile[];
-    readonly skipped: readonly ReadTreeSkipped[];
-    readonly includedBytes: number;
-    readonly truncated: boolean;
-}
 /** The `at-file` settings namespace's durable shape (host and client share it). */
 export interface AtFileSettings {
-    /** Whether the @file surface is enabled; false hides picker, dock, and expansion. */
+    /** Whether the @file surface is enabled; false hides picker, dock, and reference injection. */
     readonly enabled: boolean;
 }
 /** Wire codec: one session identity (branded string on the wire). */

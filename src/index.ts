@@ -1,9 +1,9 @@
 /**
  * dsh-at-file host plugin: mounts the `atFile` Typert Remote service
  * (workspace index search for the browser's @file picker), registers its
- * strict Typert manifest, registers the settings enable switch, and expands
- * `@path` mentions at each agent's pre-step boundary — the model reads the
- * referenced file or directory content without a wire read. The client half
+ * strict Typert manifest, registers the settings enable switch, and marks
+ * validated `@path` references at each agent's pre-step boundary. The plugin
+ * never reads mentioned file contents. The client half
  * ships in the same package (`./client`); the web server serves it under
  * /plugins/dsh-at-file/client.js.
  */
@@ -18,7 +18,7 @@ import { AtFileRuntime } from './runtime.ts'
 import { TYPERT_MANIFEST } from './typert.ts'
 import { registerAtFileSettings } from './settings.ts'
 import { mentionPreStep } from './mention.ts'
-import type { DirectoryMode, ResolvedConfig } from './types.ts'
+import type { ResolvedConfig } from './types.ts'
 
 /** Cordis plugin name (the Loader entry and client bundle id). */
 export const name = 'dsh-at-file'
@@ -30,12 +30,6 @@ export const inject = ['typert', 'settings', 'agents']
 export interface Config {
   /** Hard cap on indexed files per workspace; the walk stops and reports truncation. */
   maxIndexedFiles: number
-  /** Hard cap on one file read; larger files are refused, never truncated. */
-  maxFileBytes: number
-  /** Hard cap on one serialized directory attachment. */
-  maxTotalBytes: number
-  /** Metadata-only by default; bounded mode includes text within the aggregate cap. */
-  directoryMode: DirectoryMode
   /** Directory basenames the index walk skips entirely. */
   ignoreDirs: string[]
 }
@@ -48,14 +42,11 @@ export interface Config {
  */
 export const Config = z.object({
   maxIndexedFiles: z.natural().min(1).default(5000),
-  maxFileBytes: z.natural().min(1).default(256 * 1024),
-  maxTotalBytes: z.natural().min(1024).default(1024 * 1024),
-  directoryMode: z.union(['manifest', 'bounded'] as const).default('manifest'),
   ignoreDirs: z.array(z.string()).default(['.git', 'node_modules']),
 })
 
 /**
- * Mount the atFile service and the pre-step mention expansion.
+ * Mount the atFile service and the pre-step path-reference marker.
  * @param ctx - host cordis context.
  * @param config - validated plugin configuration (schema defaults applied).
  */
@@ -73,7 +64,7 @@ export function apply(ctx: Context, config?: Config): void {
     return () => { void dispose() }
   }, 'dsh-at-file: typert manifest')
 
-  // Expand @path mentions for every agent, at its pre-step boundary. The
+  // Mark @path references for every agent, at its pre-step boundary. The
   // listener lives on the agent's scope (the event is agent-scoped), so it
   // registers per created agent and withdraws with it. The boundary logic is
   // `mentionPreStep` (unit-tested); this is the scoped lifecycle glue.
@@ -81,10 +72,10 @@ export function apply(ctx: Context, config?: Config): void {
   ctx.on('agent/created', ({ agent }) => {
     agent.ctx.effect(() => {
       const stop = agent.ctx.on('agent/pre-step', async ({ messages, signal }, next) => {
-        return mentionPreStep(agent, resolved, isEnabled, messages, signal, next)
+        return mentionPreStep(agent, isEnabled, messages, signal, next)
       })
       return () => { stop() }
-    }, 'dsh-at-file: pre-step mention expansion')
+    }, 'dsh-at-file: pre-step path references')
   })
   /* v8 ignore stop */
 }

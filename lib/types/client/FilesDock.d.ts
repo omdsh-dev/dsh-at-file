@@ -1,7 +1,7 @@
 /**
- * Attached-files dock: one row per @path token currently in the draft,
+ * Referenced-path dock: one row per @path token currently in the draft,
  * rendered above the composer (the 'conversation.input.dock' strip). The row
- * is the user's file link before and after send: clicking the path opens the
+ * is the user's path link before and after send: clicking the path opens the
  * file on the host, the × removes the token from the draft. The draft holds
  * plain-text @path tokens (the plain-text-reference decision), so the dock
  * parses them directly; the settings scope's live enable value gates the
@@ -30,7 +30,7 @@ export declare function draftMentions(draft: string): readonly DraftMention[];
 /** Draft text with one token span removed. */
 export declare function withoutToken(draft: string, start: number, end: number): string;
 /**
- * Render the attached-file rows; null while the draft has no @path tokens or
+ * Render the referenced-path rows; null while the draft has no @path tokens or
  * the settings switch is off.
  * @param props - runtime (input currency + actions), inject, and locale shares.
  * @returns the dock strip, or null.

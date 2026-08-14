@@ -3,9 +3,8 @@
  * Codex-style file picker. `candidates` serves the smart-searched rows (the
  * workspace index is fetched once per session and filtered locally per
  * keystroke); `onPick` lands the plain-text `@path` reference — the draft
- * keeps a readable token (no chip), and the Host's pre-step boundary expands
- * it into the file content when the message ships (plain-text-reference
- * decision, matching the harness's skill source). Pure factory over injected
+ * keeps a readable token (no chip), and the Host's pre-step boundary validates
+ * it as an existence-only workspace reference. Pure factory over injected
  * deps: the browser bundle wires the real Remote and clock, tests wire stubs.
  */
 import type { InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
@@ -13,7 +12,6 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { dirnameOf } from './model.ts'
 import { rankFiles } from './search.ts'
 import type { FileEntry } from './remote.ts'
-import type { AtFileKey } from './locales.ts'
 
 /** Owner source name (the lexicon and decoration routing key). */
 export const SOURCE_NAME = 'at-file'
@@ -38,8 +36,6 @@ interface IndexCache {
 export interface AtFileSourceDeps {
   /** Search the addressed session's workspace index (Remote wrapper). */
   search(sessionId: SessionId, signal: AbortSignal): Promise<readonly FileEntry[]>
-  /** Localized submit-failure copy. */
-  t: (key: AtFileKey, params?: Record<string, string>) => string
   /** Monotonic clock for index freshness (default Date.now). */
   now?: () => number
 }
@@ -146,9 +142,8 @@ export function createAtFileSource(deps: AtFileSourceDeps): AtFileSource {
     onPick({ candidate, session }) {
       const file = findEntry(session.sessionId, candidate.name)
       if (file === undefined) return undefined
-      // Plain-text reference: the draft gains the readable @path token; the
-      // Host expands it into content at send time. A trailing slash marks a
-      // directory mention.
+      // Plain-text reference: the draft gains the readable @path token. A
+      // trailing slash marks a directory mention without reading descendants.
       const suffix = file.kind === 'dir' ? '/' : ''
       return { text: `@${file.relative}${suffix} ` }
     },

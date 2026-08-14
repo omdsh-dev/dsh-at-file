@@ -1,15 +1,14 @@
 /**
  * dsh-at-file host plugin: mounts the `atFile` Typert Remote service
  * (workspace index search for the browser's @file picker), registers its
- * strict Typert manifest, registers the settings enable switch, and expands
- * `@path` mentions at each agent's pre-step boundary — the model reads the
- * referenced file or directory content without a wire read. The client half
+ * strict Typert manifest, registers the settings enable switch, and marks
+ * validated `@path` references at each agent's pre-step boundary. The plugin
+ * never reads mentioned file contents. The client half
  * ships in the same package (`./client`); the web server serves it under
  * /plugins/dsh-at-file/client.js.
  */
 import type { Context } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
-import type { DirectoryMode } from './types.ts';
 /** Cordis plugin name (the Loader entry and client bundle id). */
 export declare const name = "dsh-at-file";
 /** Services required before load: the Typert registry, the settings provider, and the agent registry. */
@@ -18,12 +17,6 @@ export declare const inject: string[];
 export interface Config {
     /** Hard cap on indexed files per workspace; the walk stops and reports truncation. */
     maxIndexedFiles: number;
-    /** Hard cap on one file read; larger files are refused, never truncated. */
-    maxFileBytes: number;
-    /** Hard cap on one serialized directory attachment. */
-    maxTotalBytes: number;
-    /** Metadata-only by default; bounded mode includes text within the aggregate cap. */
-    directoryMode: DirectoryMode;
     /** Directory basenames the index walk skips entirely. */
     ignoreDirs: string[];
 }
@@ -35,19 +28,13 @@ export interface Config {
  */
 export declare const Config: z<Schemastery.ObjectS<{
     maxIndexedFiles: z<number, number>;
-    maxFileBytes: z<number, number>;
-    maxTotalBytes: z<number, number>;
-    directoryMode: z<"manifest" | "bounded", "manifest" | "bounded">;
     ignoreDirs: z<string[], string[]>;
 }>, Schemastery.ObjectT<{
     maxIndexedFiles: z<number, number>;
-    maxFileBytes: z<number, number>;
-    maxTotalBytes: z<number, number>;
-    directoryMode: z<"manifest" | "bounded", "manifest" | "bounded">;
     ignoreDirs: z<string[], string[]>;
 }>>;
 /**
- * Mount the atFile service and the pre-step mention expansion.
+ * Mount the atFile service and the pre-step path-reference marker.
  * @param ctx - host cordis context.
  * @param config - validated plugin configuration (schema defaults applied).
  */

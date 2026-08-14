@@ -1,15 +1,14 @@
 /**
  * The '@' trigger source over stubbed deps: candidate search via the
- * cached session index (per-keystroke filtering stays local), pick-to-chip
- * projection, lexicon rolls and invalidation, and the reference codec's
- * submit-time model serialization with localized failure copy.
+ * cached session index (per-keystroke filtering stays local), plain-text path
+ * picks, lexicon rolls, and invalidation.
  */
 import { describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientSessionContext } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { createAtFileSource, INDEX_TTL_MS, MAX_CANDIDATES, SOURCE_NAME } from '../src/client/source.ts'
 import type { FileEntry } from '../src/client/remote.ts'
-import { en, fmt, zh, type AtFileKey } from '../src/client/locales.ts'
+import { fmt } from '../src/client/locales.ts'
 
 const sid = (value: string): SessionId => value as SessionId
 const session = (id: string): ClientSessionContext => ({ sessionId: sid(id) })
@@ -24,9 +23,7 @@ const FILES: readonly FileEntry[] = [
 function harness(overrides: Partial<ConstructorParameters<typeof createAtFileSource>[0]> = {}) {
   const search = vi.fn(async (_id: SessionId) => FILES)
   let clock = 0
-  const t = (key: AtFileKey, params?: Record<string, string>): string =>
-    fmt(zh[key] ?? en[key] ?? key, params)
-  const { source, invalidateAll } = createAtFileSource({ search, t, now: () => clock, ...overrides })
+  const { source, invalidateAll } = createAtFileSource({ search, now: () => clock, ...overrides })
   return { source, invalidateAll, search, tick: (ms: number) => { clock += ms } }
 }
 

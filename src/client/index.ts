@@ -2,9 +2,9 @@
  * dsh-at-file client plugin: the browser half of the Codex-style @file
  * mention. Mounts the atFile Remote namespace, registers the '@' trigger
  * source (floating picker landing a plain-text @path token), the
- * attached-files dock above the composer (open/remove, gated by settings),
- * the settings section, and the locale dictionaries. Content expansion is
- * the Host's job at its pre-step boundary; this half only picks and links.
+ * referenced-path dock above the composer (open/remove, gated by settings),
+ * the settings section, and locale dictionaries. The Host only validates and
+ * marks the chosen path; neither half reads mentioned file content.
  */
 // Type-only: the ctx.remote merge and the forwarded Host-event face.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
@@ -77,7 +77,7 @@ export function apply(ctx: ClientContext): void {
     return result.value
   }
 
-  const { source, invalidateAll } = createAtFileSource({ search, t })
+  const { source, invalidateAll } = createAtFileSource({ search })
   // Reconnect may have rebuilt the host: cached indexes and path maps die with it.
   ctx.on('connection/reset', () => {
     invalidateAll()

@@ -1,7 +1,7 @@
 /**
  * Pure display projections for the @file picker: the split of a relative path
- * into basename + directory for the picker rows. (The model forms moved to
- * the Host's mention expansion, which is the sole content producer now.)
+ * into basename + directory for the picker rows. The Host validates selected
+ * paths and adds existence-only reference markers at send time.
  */
 /** The directory prefix of a forward-slash relative path ('' for root-level files). */
 export declare function dirnameOf(relative: string): string;

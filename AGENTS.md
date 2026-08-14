@@ -7,11 +7,11 @@ Out-of-tree DeepSeek Harness plugin (host + Web client bundle). Read [dsh-plugin
 ```
 src/index.ts        host entry: function plugin (name/inject/Config/apply, no default export)
 src/runtime.ts      AtFileRuntime (TypertRemoteService, @Remote search) — wire namespace `atFile`
-src/mention.ts      Host pre-step mention expansion (scan @path, read file/dir, inject content) + mentionPreStep
-src/contract.ts     one shared descriptor set + zod codecs + the FileEntry/FileContent types
+src/mention.ts      Host pre-step path marker (scan @path, validate existence, inject path/kind only) + mentionPreStep
+src/contract.ts     one shared descriptor set + zod codecs + FileEntry/settings types
 src/typert.ts       strict host Typert manifest, registered via ctx.typert.register
 src/settings.ts     the `at-file` settings namespace (enable switch)
-src/files.ts        bounded workspace index walk + complete-result-bounded reads over node:fs
+src/files.ts        bounded workspace path index walk over node:fs
 src/invariant.ts    ./invariant companion (real `No runtime invariant:` reason)
 src/client/         browser half, served as the single file /plugins/dsh-at-file/client.js
   index.ts          apply: $mount the Remote contribution, register the @ source + dock + section + locale + styles
@@ -25,7 +25,7 @@ tests/              node-env specs; jsdom pragma on the browser specs
 
 ## Contracts with the harness (do not drift)
 
-- The only wire endpoint is `atFile/search` (agent lookup → workspace index). File content NEVER crosses the wire: the Host expands `@path` tokens at the `agent/pre-step` boundary (see `src/mention.ts`) and injects user-role messages with source `at-file-mention`.
+- The only wire endpoint is `atFile/search` (agent lookup → workspace index). File content NEVER crosses the wire or the Host mention boundary: `agent/pre-step` validates each `@path` and injects only `<workspace-reference path="…" kind="file|directory" />` with source `at-file-mention`. The agent decides whether and how to inspect it with available tools.
 - The Host Gateway resolves the endpoint through the **strict Typert manifest** (`src/typert.ts`, registered via `ctx.typert.register`) — never through `@Remote` marker tables, because the harness's source-launch dev environment loads the gateway from protocol `src` while a profile-loaded plugin bundle loads protocol `lib` (two marker tables). The `@Remote` decorator stays for documentation and lib-consistent deployments.
 - The descriptor set lives in `src/contract.ts` and is shared verbatim by the host manifest and the client contribution; the agent lookup codec's `typeSymbol` must stay `@deepseek-ai/dsh-session/types#SessionId`.
 - The client composes only through the standing seams (`ctx.remote.$mount`, `inputTriggers.registerSource`, `ctx.slots.register`, `ctx.locale.register`, `ctx.settingsScope.bind`). The mounted Remote namespace is resolved through `ctx.reflect.get('remote.atFile')` — NOT the dotted `ctx.remote.atFile` read, which walks the fiber chain and stops at the Loader's runtime-less forks (verified live; the store path resolves by isolation label).

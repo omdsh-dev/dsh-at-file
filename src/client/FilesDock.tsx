@@ -1,7 +1,7 @@
 /**
- * Attached-files dock: one row per @path token currently in the draft,
+ * Referenced-path dock: one row per @path token currently in the draft,
  * rendered above the composer (the 'conversation.input.dock' strip). The row
- * is the user's file link before and after send: clicking the path opens the
+ * is the user's path link before and after send: clicking the path opens the
  * file on the host, the × removes the token from the draft. The draft holds
  * plain-text @path tokens (the plain-text-reference decision), so the dock
  * parses them directly; the settings scope's live enable value gates the
@@ -20,7 +20,7 @@ export interface AtFileDockInjected {
 /** Full dock entry props: InputZone owner share + session standard kit + injected face + locale seat. */
 export type AtFileDockProps = PropsRuntime<'conversation.input.dock'> & InjectFace<AtFileDockInjected> & PropsLocale<'at-file'>
 
-/** The same token grammar the Host's mention expansion scans. */
+/** The same token grammar the Host's reference marker scans. */
 const MENTION_PATTERN = /@([^\s@]+)/g
 
 /** One parsed mention token in the draft, with its span for precise removal. */
@@ -50,7 +50,7 @@ export function withoutToken(draft: string, start: number, end: number): string 
 }
 
 /**
- * Render the attached-file rows; null while the draft has no @path tokens or
+ * Render the referenced-path rows; null while the draft has no @path tokens or
  * the settings switch is off.
  * @param props - runtime (input currency + actions), inject, and locale shares.
  * @returns the dock strip, or null.
