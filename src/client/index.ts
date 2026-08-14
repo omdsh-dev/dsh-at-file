@@ -30,7 +30,6 @@ import { NS, en, zh } from './locales.ts'
 import { adoptStyles } from './styles.ts'
 import { FolderNavigator, type FolderNavigatorInjected } from './FolderNavigator.tsx'
 import {
-  DEFAULT_IGNORE_FILES,
   defaultAtFileSettings,
   ignoreFilesSettingsKey,
   normalizeIgnoreFiles,
@@ -116,7 +115,10 @@ export function apply(ctx: ClientContext): void {
         if (atFile === remote && generation === settingsGeneration) reportSettingsError('update', error)
       }
     })
-    settingsTail = operation.catch(() => {})
+    settingsTail = operation.catch(
+      /* v8 ignore next -- every Remote and publication failure is contained inside operation. */
+      () => {},
+    )
     return operation
   }
 
@@ -160,16 +162,13 @@ export function apply(ctx: ClientContext): void {
   // The settings switch gates the picker live. The schema default applies
   // until the first Host read, then every returned update replaces the snapshot.
   let sourceRegistered = false
+  /* v8 ignore next -- replaced before use whenever a source is registered. */
   let sourceDispose = (): void => {}
   let ignoreFilesKey: string | undefined
   const syncSource = (): void => {
     const value = scope.getSnapshot().value
-    const enabled = value?.enabled ?? true
-    const nextIgnoreFilesKey = ignoreFilesSettingsKey(value ?? {
-      enabled: true,
-      ignoreFiles: [...DEFAULT_IGNORE_FILES],
-      workspaceIgnoreFiles: [],
-    })
+    const enabled = value.enabled
+    const nextIgnoreFilesKey = ignoreFilesSettingsKey(value)
     if (ignoreFilesKey !== undefined && ignoreFilesKey !== nextIgnoreFilesKey) {
       invalidateAll()
       entryByRel.clear()
@@ -180,6 +179,7 @@ export function apply(ctx: ClientContext): void {
       sourceRegistered = true
     } else if (!enabled && sourceRegistered) {
       sourceDispose()
+      /* v8 ignore next -- keeps teardown callable after the live registration is removed. */
       sourceDispose = () => {}
       sourceRegistered = false
     }
@@ -252,7 +252,7 @@ export function apply(ctx: ClientContext): void {
         await updateSettings({ field: 'ignoreFiles', value: [...ignoreFiles] })
       },
       setWorkspaceIgnoreFiles: async (workspace: string, ignoreFiles: readonly string[]) => {
-        const current = normalizeWorkspaceIgnoreFiles(scope.getSnapshot().value?.workspaceIgnoreFiles ?? [])
+        const current = normalizeWorkspaceIgnoreFiles(scope.getSnapshot().value.workspaceIgnoreFiles)
         const target = workspacePathKey(workspace)
         const next = current.filter(entry => workspacePathKey(entry.workspace) !== target)
         const normalized = normalizeIgnoreFiles(ignoreFiles)

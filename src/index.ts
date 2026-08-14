@@ -76,7 +76,6 @@ export function apply(ctx: Context, config?: Config): void {
     }
     return settings.get()
   }
-  const isEnabled = (): boolean => readSettings().enabled
   new AtFileRuntime(ctx, resolved, readSettings, writeSettings)
   // Strict endpoint registration: the gateway resolves atFile/search from
   // this manifest, independent of decorator marker state.
@@ -90,10 +89,11 @@ export function apply(ctx: Context, config?: Config): void {
   // registers per created agent and withdraws with it. The boundary logic is
   // `mentionPreStep` (unit-tested); this is the scoped lifecycle glue.
   /* v8 ignore start -- agent-scoped registration glue; the boundary behavior is mentionPreStep and the event plumbing is harness-owned. */
+  /* v8 ignore next -- callback executes only for live Harness Agent creation. */
   ctx.on('agent/created', ({ agent }) => {
     agent.ctx.effect(() => {
       const stop = agent.ctx.on('agent/pre-step', async ({ messages, signal }, next) => {
-        return mentionPreStep(agent, isEnabled, messages, signal, next)
+        return mentionPreStep(agent, () => settings.get().enabled, messages, signal, next)
       })
       return () => { stop() }
     }, 'dsh-at-file: pre-step path references')

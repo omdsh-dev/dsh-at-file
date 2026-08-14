@@ -142,7 +142,11 @@ export function AtFileSection({
     setSaving(true)
     try {
       if (filterScope === 'global') await setIgnoreFiles(normalizeIgnoreFiles(files))
-      else if (workspaceAvailable) await setWorkspaceIgnoreFiles(selectedWorkspaceValue, normalizeIgnoreFiles(files))
+      else {
+        /* v8 ignore next -- workspace actions are disabled when no workspace is available. */
+        if (!workspaceAvailable) return
+        await setWorkspaceIgnoreFiles(selectedWorkspaceValue, normalizeIgnoreFiles(files))
+      }
     } finally {
       setSaving(false)
     }

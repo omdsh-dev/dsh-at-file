@@ -196,6 +196,59 @@ describe('dsh-at-file client apply', () => {
       .toMatchObject({ enabled: false, ignoreFiles: ['reset.tmp'] })
   })
 
+  it('does not publish an older settings read after a reconnect', async () => {
+    let resolveFirst: ((result: RemoteResult<AtFileSettings>) => void) | undefined
+    const first = new Promise<RemoteResult<AtFileSettings>>(resolve => { resolveFirst = resolve })
+    let calls = 0
+    const booted = await boot({
+      atFileGetSettings: async () => {
+        calls += 1
+        if (calls === 1) return first
+        return {
+          ok: true,
+          value: { enabled: false, ignoreFiles: ['fresh.tmp'], workspaceIgnoreFiles: [] },
+        }
+      },
+    })
+    booted.ctx.emit('connection/reset')
+    await Promise.resolve()
+    await Promise.resolve()
+    resolveFirst?.({
+      ok: true,
+      value: { enabled: true, ignoreFiles: ['stale.tmp'], workspaceIgnoreFiles: [] },
+    })
+    await Promise.resolve()
+    expect(settingsSection(booted).inject().hooks.scope.getSnapshot().value)
+      .toMatchObject({ enabled: false, ignoreFiles: ['fresh.tmp'] })
+  })
+
+  it('silences a stale settings read rejection after a reconnect', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let rejectFirst: ((error: Error) => void) | undefined
+    const first = new Promise<RemoteResult<AtFileSettings>>((_resolve, reject) => { rejectFirst = reject })
+    let calls = 0
+    try {
+      const booted = await boot({
+        atFileGetSettings: async () => {
+          calls += 1
+          if (calls === 1) return first
+          return {
+            ok: true,
+            value: { enabled: false, ignoreFiles: ['fresh.tmp'], workspaceIgnoreFiles: [] },
+          }
+        },
+      })
+      booted.ctx.emit('connection/reset')
+      await Promise.resolve()
+      await Promise.resolve()
+      rejectFirst?.(new Error('stale read'))
+      await Promise.resolve()
+      expect(errorSpy).not.toHaveBeenCalled()
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
   it('logs a structured settings read failure and keeps the last snapshot', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
@@ -247,6 +300,43 @@ describe('dsh-at-file client apply', () => {
       })
       await settingsSection(booted).inject().setEnabled(false)
       expect(errorSpy).toHaveBeenCalledWith('[dsh-at-file] settings update failed:', expect.any(Error))
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('does not publish an older settings update after a reconnect', async () => {
+    let resolveUpdate: ((result: RemoteResult<AtFileSettings>) => void) | undefined
+    const pending = new Promise<RemoteResult<AtFileSettings>>(resolve => { resolveUpdate = resolve })
+    const booted = await boot({ atFileUpdateSettings: async () => pending })
+    const write = settingsSection(booted).inject().setEnabled(false)
+    await Promise.resolve()
+    booted.ctx.emit('connection/reset')
+    await Promise.resolve()
+    await Promise.resolve()
+    resolveUpdate?.({
+      ok: true,
+      value: { enabled: false, ignoreFiles: ['stale.tmp'], workspaceIgnoreFiles: [] },
+    })
+    await write
+    expect(settingsSection(booted).inject().hooks.scope.getSnapshot().value)
+      .toMatchObject({ enabled: true, ignoreFiles: DEFAULT_IGNORE_FILES })
+  })
+
+  it('silences a stale settings update rejection after a reconnect', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let rejectUpdate: ((error: Error) => void) | undefined
+    const pending = new Promise<RemoteResult<AtFileSettings>>((_resolve, reject) => { rejectUpdate = reject })
+    try {
+      const booted = await boot({ atFileUpdateSettings: async () => pending })
+      const write = settingsSection(booted).inject().setEnabled(false)
+      await Promise.resolve()
+      booted.ctx.emit('connection/reset')
+      await Promise.resolve()
+      await Promise.resolve()
+      rejectUpdate?.(new Error('stale write'))
+      await write
+      expect(errorSpy).not.toHaveBeenCalled()
     } finally {
       errorSpy.mockRestore()
     }
