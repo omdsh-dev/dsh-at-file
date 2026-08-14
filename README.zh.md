@@ -1,39 +1,47 @@
 # dsh-at-file
 
-DeepSeek Harness Web GUI 的 Codex 风格工作区路径引用插件。在输入框输入 `@`，搜索文件或目录，并把可读的 `@路径` 插入提示词。
+DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `@`，可以搜索当前工作区并插入文件或目录路径。
 
-![@ 文件提及效果演示](assets/screenshots/show-case.png)
+![@ 路径选择器](assets/screenshots/show-case.png)
 
-```
-输入框:   看一下这个  @README.       <- 浮动工作区路径选择器
-            +----------------------------+
-            | README.md                  |
-            | docs/                      |
-            +----------------------------+
-草稿:     看一下这个 @README.md      <- 纯文本路径引用
-引用条:   README.md  x               <- 打开/移除操作
-模型:     <workspace-reference path="README.md" kind="file" />
+## 使用方式
+
+从 `@` 菜单选择结果后，路径会保留在输入内容中。输入框上方的引用栏可以打开路径或移除引用。
+
+```text
+请检查 @docs/spec.pdf
 ```
 
-`@` 表达的是“用户明确引用了工作区里的这个路径”，不是“把这个文件复制进提示词”。Host 在 agent pre-step 边界只验证路径仍然存在，并传递相对路径与类型；它不会读取文件字节，也不会遍历被引用目录的后代。
+每次 agent 开始处理前，插件会确认该路径位于当前工作区且仍然存在。确认成功后，插件会补充一条简短的引用消息：
 
-是否读取、如何读取，由 agent 根据当前会话可用的工具自行决定。文本、图片、PDF、压缩包、大文件和目录在本插件里具有完全相同的引用语义；具体格式能否解析属于 agent 工具的能力，不属于本插件。
+```xml
+<workspace-reference path="docs/spec.pdf" kind="file" />
+```
 
-## 安装
+引用消息仅包含工作区相对路径和路径类型。插件不会打开引用文件，也不会列出引用目录中的内容。任务需要读取时，由 agent 使用当前会话中可用的工具处理该路径。
+
+文件格式和文件大小不会改变处理流程。PDF 与其他工作区文件使用相同的路径引用机制。
+
+以上机制适用于 `0.3.0` 及后续版本。早期版本会在提交时读取文件内容，并受文件大小限制。
+
+## 安装或更新
 
 ```sh
 dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.3.0.tar.gz
 ```
 
-随后重启 web 服务，让 Host 和 client bundle 加载新版本。插件依赖标准 `dsh web` 组合中的 `@` 输入触发管线、API gateway、会话插槽、设置与 agent registry。
+已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.3.0`。
 
-启用开关位于 **设置 -> 文件提及**。
+插件开关位于 **设置 -> 文件提及**。
 
 ## 配置
 
-以下参数只控制用户侧的工作区搜索索引。插件不会读取文件内容，因此没有文件大小或上下文注入预算配置。
+当前配置只影响路径选择器的索引：
 
-如需覆盖默认值，把完整 config 写入所选 profile 的 `cordis.patch.yml`，例如 `~/.dsh/profiles/web/cordis.patch.yml`：
+- `maxIndexedFiles` 设置工作区索引条目的数量上限。
+- `ignoreDirs` 设置不进入索引的目录名。
+
+请把完整配置写入所选 profile 的 `cordis.patch.yml`。常用路径为 `~/.dsh/profiles/web/cordis.patch.yml`。
 
 ```yaml
 - id: dsh-at-file
@@ -42,42 +50,30 @@ dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/re
     ignoreDirs: ['.git', 'node_modules']
 ```
 
-profile patch 会整体替换 `config`，因此修改任一字段时都要保留这两个字段。
+profile patch 会整体替换 `config` 对象。修改任一配置时，请保留两个字段。
 
-## 对模型的影响
+## 路径处理
 
-| 方面 | 效果 |
-| --- | --- |
-| 含义 | 一个小标记表示用户引用了某个确实存在的工作区路径。 |
-| Token 开销 | 每个引用固定且很小；不注入文件内容，也不注入目录清单。 |
-| 工具调用 | agent 自行决定是否搜索、读取、渲染或以其他方式检查该路径。 |
-| 消息格式 | `<workspace-reference path="<工作区相对路径>" kind="file|directory" />`，以来源 `at-file-mention` 的用户消息注入。 |
-| 文件类型 | 与格式无关；文本、二进制、PDF、图片、压缩包等普通文件都可以被引用。 |
+- 选择器索引当前工作区中的常规文件和目录，并跳过已配置的目录名与符号链接。
+- Host 接受工作区相对路径。绝对路径以及越出工作区的路径会被忽略。
+- 只有用户输入的文本可以生成引用消息。
+- 点击引用路径时会调用 Harness 的 `host.openPath` 端点。
+- 每个会话的路径索引缓存 30 秒。
+- `@路径` 不能包含空白字符或另一个 `@` 字符。
+- `maxIndexedFiles` 限制选择器显示的结果。手动输入的路径只要位于工作区且确实存在，仍然可以引用。
 
-## 权限边界
-
-- 选择器索引会话工作区，并跳过配置的目录名和符号链接。
-- Host 只解析相对 token，拒绝绝对路径和词法上的 `..` 越界。
-- 只有 `source.kind === 'user'` 的文本可以创建模型可见引用。
-- 点击路径使用 Harness 的 `host.openPath` 端点。
+当前 agent 可能没有处理某种文件格式的工具。DSH 的 `read` 用于 UTF-8 文本，`read_image` 用于支持的图片格式。PDF 的处理能力取决于当前会话提供的工具。
 
 ## 开发
 
 ```sh
 pnpm install
-pnpm run check          # 类型检查 + 测试 + 构建
+pnpm run check
 pnpm run test
 pnpm run build
 ```
 
-本仓库假设 Harness 位于 `../dsh`，用于开发期链接和测试别名。构建后的 `lib/` 会提交进仓库，因此 profile 安装不需要执行生命周期构建脚本。
-
-## 已知限制
-
-- 引用路径不保证当前 agent 拥有可解析该格式的工具。DSH 标准 `read` 工具读取 UTF-8 文本，`read_image` 读取支持的图片；PDF 能否读取取决于当前可用工具。
-- 工作区选择器索引按会话缓存 30 秒。
-- `@路径` token 不能包含空白或 `@`（语法为 `@[^\s@]+`）。
-- `maxIndexedFiles` 只限制选择器发现范围；手动输入的、确实存在的相对路径仍可被引用。
+开发环境默认 Harness 仓库位于 `../dsh`。`lib/` 中的构建产物会提交到仓库，因此 profile 安装过程无需运行包构建脚本。
 
 ## License
 
