@@ -7,7 +7,7 @@ import type { ReactElement } from 'react'
 import { AtFileSection, parseIgnoreFile, type AtFileSectionProps } from '../src/client/SettingsSection.tsx'
 import { fmt, zh } from '../src/client/locales.ts'
 import { DEFAULT_IGNORE_FILES } from '../src/defaults.ts'
-import type { AtFileSettings, WorkspaceIgnoreFiles } from '../src/contract.ts'
+import type { AtFileSettings, FileIgnoreRuleInput, WorkspaceIgnoreFiles } from '../src/contract.ts'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = false
 
@@ -29,14 +29,14 @@ function workspace(workspaceId: string, path: string, title: string): WorkspaceS
 function props(over: {
   unloaded?: boolean
   enabled?: boolean
-  ignoreFiles?: readonly string[]
+  ignoreFiles?: readonly FileIgnoreRuleInput[]
   workspaceIgnoreFiles?: readonly WorkspaceIgnoreFiles[]
   workspaces?: readonly WorkspaceStub[]
   currentCwd?: string
   recentWorkspaceId?: string
   setEnabled?: (enabled: boolean) => Promise<void>
-  setIgnoreFiles?: (ignoreFiles: readonly string[]) => Promise<void>
-  setWorkspaceIgnoreFiles?: (workspace: string, ignoreFiles: readonly string[]) => Promise<void>
+  setIgnoreFiles?: (ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
+  setWorkspaceIgnoreFiles?: (workspace: string, ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
 } = {}): AtFileSectionProps {
   const value: AtFileSettings | undefined = over.unloaded === true
     ? undefined
@@ -237,6 +237,54 @@ describe('AtFileSection', () => {
     setInput(input, 'keyboard.tmp')
     pressEnter(input)
     expect(setIgnoreFiles).toHaveBeenCalledWith(['keyboard.tmp'])
+    root.unmount()
+  })
+
+  it('adds a case-sensitive exact rule as a structured setting', () => {
+    const setIgnoreFiles = vi.fn(async () => {})
+    const { root, container } = mount(<AtFileSection {...props({ ignoreFiles: [], setIgnoreFiles })} />)
+    const caseToggle = container.querySelector('.dsh_atFile_caseToggle input') as HTMLInputElement
+    click(caseToggle)
+    setInput(container.querySelector('.dsh_atFile_filterInput') as HTMLInputElement, 'Case.TMP')
+    click(button(container, zh['settings.add']))
+    expect(setIgnoreFiles).toHaveBeenCalledWith([
+      { kind: 'exact', pattern: 'Case.TMP', caseSensitive: true },
+    ])
+    root.unmount()
+  })
+
+  it('validates and adds regular-expression rules', () => {
+    const setIgnoreFiles = vi.fn(async () => {})
+    const { root, container } = mount(<AtFileSection {...props({ ignoreFiles: [], setIgnoreFiles })} />)
+    click(button(container, zh['settings.kind.regex']))
+    const input = container.querySelector('.dsh_atFile_filterInput') as HTMLInputElement
+    expect(input.placeholder).toBe(zh['settings.regexPlaceholder'])
+    setInput(input, '[')
+    expect(container.textContent).toContain(zh['settings.invalidRegex'])
+    expect(button(container, zh['settings.add']).disabled).toBe(true)
+
+    setInput(input, '\\.map$')
+    click(container.querySelector('.dsh_atFile_caseToggle input') as HTMLInputElement)
+    click(button(container, zh['settings.add']))
+    expect(setIgnoreFiles).toHaveBeenCalledWith([
+      { kind: 'regex', pattern: '\\.map$', caseSensitive: true },
+    ])
+    click(button(container, zh['settings.kind.exact']))
+    expect((container.querySelector('.dsh_atFile_filterInput') as HTMLInputElement).placeholder)
+      .toBe(zh['settings.namePlaceholder'])
+    root.unmount()
+  })
+
+  it('renders and removes structured rules with matching badges', () => {
+    const setIgnoreFiles = vi.fn(async () => {})
+    const { root, container } = mount(<AtFileSection {...props({
+      ignoreFiles: [{ kind: 'regex', pattern: '\\.log$', caseSensitive: true }],
+      setIgnoreFiles,
+    })} />)
+    expect(container.querySelector('.dsh_atFile_filterRow')?.textContent).toContain(zh['settings.kind.regex'])
+    expect(container.querySelector('.dsh_atFile_filterRow')?.textContent).toContain(zh['settings.caseSensitive'])
+    click(container.querySelector('.dsh_atFile_filterRemove') as HTMLButtonElement)
+    expect(setIgnoreFiles).toHaveBeenCalledWith([])
     root.unmount()
   })
 

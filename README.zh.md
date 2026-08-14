@@ -39,10 +39,10 @@ DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `
 ## 安装或更新
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.5.1.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.0.tar.gz
 ```
 
-已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.5.1`。
+已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.6.0`。
 
 ## 文件过滤
 
@@ -51,9 +51,15 @@ dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/re
 - **全局** 保存所有工作区共用的规则。
 - **工作区** 保存当前所选工作区路径的附加规则。每个工作区都有独立列表，面板中会同时显示该工作区继承的全局规则。
 
-每条规则匹配一个完整文件名，匹配时不区分大小写。规则可以逐项添加和删除。**恢复默认值** 会重置全局列表，**清空工作区规则** 只会移除当前工作区的附加项。
+每条规则可以单独选择匹配方式和大小写设置：
 
-设置通过插件自己的 Host 接口保存到 DSH web profile。升级后，`0.4.1` 中已有的 `ignoreFiles` 会继续作为全局列表使用。修改规则时会清除相关索引缓存，下一次输入 `@` 即可使用新规则。
+- **Exact** 匹配一个完整文件名，不接受路径分隔符。
+- **Regex** 使用 JavaScript 正则表达式匹配完整文件名。匹配内容不包含父目录或工作区路径。
+- **区分大小写** 可以用于任何 Exact 或 Regex 规则，默认关闭。
+
+规则可以逐项添加和删除。无效正则会在保存前显示错误，Host 也会拒绝无效规则。**恢复默认值** 会重置全局列表，**清空工作区规则** 只会移除当前工作区的附加项。
+
+设置通过插件自己的 Host 接口保存到 DSH web profile。已有的字符串规则会继续作为不区分大小写的 Exact 规则使用，包括全局列表和工作区列表。修改规则时会清除相关索引缓存，下一次输入 `@` 即可使用新规则。
 
 ## 配置
 

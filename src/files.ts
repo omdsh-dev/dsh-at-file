@@ -7,8 +7,8 @@
 import { opendir } from 'node:fs/promises'
 import type { Dir } from 'node:fs'
 import { join, relative, sep } from 'node:path'
-import type { FileEntry } from './contract.ts'
-import { normalizeIgnoreFiles } from './defaults.ts'
+import type { FileEntry, FileIgnoreRuleInput } from './contract.ts'
+import { compileIgnoreRules } from './defaults.ts'
 
 /** Options for one bounded index pass. */
 export interface IndexOptions {
@@ -16,8 +16,8 @@ export interface IndexOptions {
   readonly maxFiles: number
   /** Directory basenames the walk skips (children never enqueue). */
   readonly ignoreDirs: readonly string[]
-  /** File basenames omitted from the index, matched case-insensitively. */
-  readonly ignoreFiles: readonly string[]
+  /** Exact and Regex basename filters applied before files enter the index. */
+  readonly ignoreFiles: readonly FileIgnoreRuleInput[]
 }
 
 /** One index pass result: the sorted file list plus the honest truncation flag. */
@@ -102,7 +102,10 @@ export async function indexWorkspace(
   signal?: AbortSignal,
 ): Promise<WorkspaceIndex> {
   const ignoreDirs = new Set(options.ignoreDirs)
-  const ignoreFiles = new Set(normalizeIgnoreFiles(options.ignoreFiles).map(name => name.toLowerCase()))
+  const ignoreRules = compileIgnoreRules(options.ignoreFiles)
+  const compiledRegex = new Map(ignoreRules
+    .filter(rule => rule.kind === 'regex')
+    .map(rule => [rule, new RegExp(rule.pattern, rule.caseSensitive ? '' : 'i')]))
   const files: FileEntry[] = []
   const queue: string[] = [root]
   let truncated = false
@@ -137,7 +140,12 @@ export async function indexWorkspace(
           queue.push(child)
           continue
         }
-        if (dirent.isFile() && !ignoreFiles.has(dirent.name.toLowerCase())) {
+        if (dirent.isFile() && !ignoreRules.some(rule => {
+          if (rule.kind === 'exact') {
+            return rule.caseSensitive ? dirent.name === rule.pattern : dirent.name.toLowerCase() === rule.pattern.toLowerCase()
+          }
+          return (compiledRegex.get(rule) as RegExp).test(dirent.name)
+        })) {
           files.push({ path: child, relative: displayRelative(root, child), kind: 'file' })
         }
       }

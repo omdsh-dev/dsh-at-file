@@ -38,6 +38,22 @@ describe('AT_FILE_REMOTE', () => {
     expect(schema.parse({ field: 'enabled', value: false })).toEqual({ field: 'enabled', value: false })
     expect(schema.parse({ field: 'workspaceIgnoreFiles', value: [{ workspace: '/ws', ignoreFiles: ['a.tmp'] }] }))
       .toEqual({ field: 'workspaceIgnoreFiles', value: [{ workspace: '/ws', ignoreFiles: ['a.tmp'] }] })
+    expect(schema.parse({
+      field: 'ignoreFiles',
+      value: [
+        { kind: 'exact', pattern: 'Case.tmp', caseSensitive: true },
+        { kind: 'regex', pattern: '\\.map$', caseSensitive: false },
+        { kind: 'regex', pattern: '\\.MAP$', caseSensitive: true },
+      ],
+    })).toEqual({
+      field: 'ignoreFiles',
+      value: [
+        { kind: 'exact', pattern: 'Case.tmp', caseSensitive: true },
+        { kind: 'regex', pattern: '\\.map$', caseSensitive: false },
+        { kind: 'regex', pattern: '\\.MAP$', caseSensitive: true },
+      ],
+    })
+    expect(() => schema.parse({ field: 'ignoreFiles', value: [{ kind: 'regex', pattern: '[', caseSensitive: false }] })).toThrow()
     expect(() => schema.parse({ field: 'enabled', value: 'false' })).toThrow()
   })
 

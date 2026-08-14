@@ -183,4 +183,36 @@ describe('indexWorkspace', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('applies exact and regular-expression rules with independent case sensitivity', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-regex-ignore-'))
+    try {
+      for (const name of ['exact.tmp', 'bundle.map', 'BUNDLE.MAP', 'keep.ts']) {
+        await writeFile(join(root, name), 'fixture\n')
+      }
+      const { files } = await indexWorkspace(root, {
+        maxFiles: 100,
+        ignoreDirs: [],
+        ignoreFiles: [
+          { kind: 'exact', pattern: 'Exact.TMP', caseSensitive: true },
+          { kind: 'regex', pattern: '\\.map$', caseSensitive: false },
+        ],
+      })
+      expect(files.map(file => file.relative)).toEqual(['exact.tmp', 'keep.ts'])
+
+      const sensitive = await indexWorkspace(root, {
+        maxFiles: 100,
+        ignoreDirs: [],
+        ignoreFiles: [
+          { kind: 'exact', pattern: 'exact.tmp', caseSensitive: true },
+          { kind: 'regex', pattern: '\\.MAP$', caseSensitive: true },
+        ],
+      })
+      expect(sensitive.files.map(file => file.relative)).toContain('bundle.map')
+      expect(sensitive.files.map(file => file.relative)).not.toContain('BUNDLE.MAP')
+      expect(sensitive.files.map(file => file.relative)).not.toContain('exact.tmp')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })

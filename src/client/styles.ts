@@ -289,6 +289,26 @@ export const cssText = `
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.dsh_atFile_ruleMain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-width: 0;
+}
+.dsh_atFile_ruleBadge {
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+}
+.dsh_atFile_ruleMain .dsh_atFile_filterName {
+  flex: 1 1 180px;
+}
 .dsh_atFile_filterRemove {
   display: inline-flex;
   align-items: center;
@@ -324,6 +344,48 @@ export const cssText = `
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+}
+.dsh_atFile_ruleMode {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+.dsh_atFile_ruleModeButton {
+  min-width: 72px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dsh_atFile_ruleModeButton[aria-pressed='true'] {
+  background: var(--dsw-alias-button-ghost-active-fill);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+}
+.dsh_atFile_caseToggle {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+.dsh_atFile_caseToggle input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--dsw-alias-brand-primary);
 }
 .dsh_atFile_filterAddRow .dsh_atFile_filterInput {
   flex: 1 1 240px;

@@ -1,4 +1,4 @@
-import type { AtFileSettings, WorkspaceIgnoreFiles } from './contract.ts'
+import type { AtFileSettings, FileIgnoreRule, FileIgnoreRuleInput, WorkspaceIgnoreFiles } from './contract.ts'
 
 /** Directory basenames omitted from the picker unless the profile supplies its own list. */
 export const DEFAULT_IGNORE_DIRS = [
@@ -80,18 +80,61 @@ export function defaultAtFileSettings(): AtFileSettings {
   }
 }
 
-/** Trim file basenames and remove empty or case-insensitive duplicate entries. */
-export function normalizeIgnoreFiles(values: readonly string[]): string[] {
+/** Trim rules and remove empty entries or duplicates with identical matching semantics. */
+export function normalizeIgnoreFiles(values: readonly FileIgnoreRuleInput[]): FileIgnoreRuleInput[] {
   const seen = new Set<string>()
-  const normalized: string[] = []
+  const normalized: FileIgnoreRuleInput[] = []
   for (const value of values) {
-    const name = value.trim()
-    const key = name.toLowerCase()
-    if (name === '' || seen.has(key)) continue
+    const rule = normalizeIgnoreRule(value)
+    if (rule === undefined) continue
+    const key = ignoreRuleKey(rule)
+    if (seen.has(key)) continue
     seen.add(key)
-    normalized.push(name)
+    // Keep legacy strings as strings so existing settings documents and callers
+    // remain stable. New structured rules retain their explicit shape.
+    normalized.push(typeof value === 'string' && rule.kind === 'exact' && !rule.caseSensitive
+      ? rule.pattern
+      : rule)
   }
   return normalized
+}
+
+/** Convert one legacy or structured setting value into its canonical rule. */
+export function normalizeIgnoreRule(value: FileIgnoreRuleInput): FileIgnoreRule | undefined {
+  if (typeof value === 'string') {
+    const pattern = value.trim()
+    return pattern === '' ? undefined : { kind: 'exact', pattern, caseSensitive: false }
+  }
+  const pattern = value.pattern.trim()
+  if (pattern === '') return undefined
+  const rule: FileIgnoreRule = {
+    kind: value.kind,
+    pattern,
+    caseSensitive: value.caseSensitive,
+  }
+  if (rule.kind === 'regex') {
+    try {
+      new RegExp(rule.pattern, rule.caseSensitive ? '' : 'i')
+    } catch (error) {
+      /* v8 ignore next -- RegExp construction throws an Error in supported runtimes. */
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`Invalid regular expression "${rule.pattern}": ${message}`)
+    }
+  }
+  return rule
+}
+
+/** Stable identity for one rule, including matching semantics. */
+export function ignoreRuleKey(value: FileIgnoreRuleInput): string {
+  const rule = normalizeIgnoreRule(value)
+  if (rule === undefined) return ''
+  const pattern = rule.kind === 'exact' && !rule.caseSensitive ? rule.pattern.toLowerCase() : rule.pattern
+  return JSON.stringify([rule.kind, pattern, rule.caseSensitive])
+}
+
+/** Compile rules once for a bounded directory walk. */
+export function compileIgnoreRules(values: readonly FileIgnoreRuleInput[]): readonly FileIgnoreRule[] {
+  return normalizeIgnoreFiles(values).map(value => normalizeIgnoreRule(value) as FileIgnoreRule)
 }
 
 /** Stable comparison key for one canonical workspace path. */
@@ -131,7 +174,7 @@ export function normalizeWorkspaceIgnoreFiles(
 export function workspaceIgnoreFilesFor(
   entries: readonly WorkspaceIgnoreFiles[],
   workspace: string,
-): string[] {
+): FileIgnoreRuleInput[] {
   const key = workspacePathKey(workspace)
   const entry = normalizeWorkspaceIgnoreFiles(entries)
     .find(candidate => workspacePathKey(candidate.workspace) === key)
@@ -139,7 +182,7 @@ export function workspaceIgnoreFilesFor(
 }
 
 /** Effective file-name filters for one workspace: global rules plus local additions. */
-export function effectiveIgnoreFiles(settings: AtFileSettings, workspace: string): string[] {
+export function effectiveIgnoreFiles(settings: AtFileSettings, workspace: string): FileIgnoreRuleInput[] {
   return normalizeIgnoreFiles([
     ...settings.ignoreFiles,
     ...workspaceIgnoreFilesFor(settings.workspaceIgnoreFiles ?? [], workspace),
@@ -148,11 +191,11 @@ export function effectiveIgnoreFiles(settings: AtFileSettings, workspace: string
 
 /** Stable cache key covering every file-name filter setting. */
 export function ignoreFilesSettingsKey(settings: AtFileSettings): string {
-  const global = normalizeIgnoreFiles(settings.ignoreFiles).map(name => name.toLowerCase()).sort()
+  const global = normalizeIgnoreFiles(settings.ignoreFiles).map(ignoreRuleKey).sort()
   const workspaces = normalizeWorkspaceIgnoreFiles(settings.workspaceIgnoreFiles ?? [])
     .map(entry => ({
       workspace: workspacePathKey(entry.workspace),
-      ignoreFiles: entry.ignoreFiles.map(name => name.toLowerCase()).sort(),
+      ignoreFiles: entry.ignoreFiles.map(ignoreRuleKey).sort(),
     }))
     .sort((left, right) => left.workspace.localeCompare(right.workspace))
   return JSON.stringify({ global, workspaces })

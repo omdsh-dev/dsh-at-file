@@ -21,7 +21,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: brings the settings.section SlotMap declaration into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { AtFileSettings, AtFileSettingsUpdate, FileEntry } from '../contract.ts'
+import type { AtFileSettings, AtFileSettingsUpdate, FileEntry, FileIgnoreRuleInput } from '../contract.ts'
 import { AT_FILE_REMOTE } from './remote.ts'
 import { createAtFileSource } from './source.ts'
 import { FilesDock, type AtFileDockInjected } from './FilesDock.tsx'
@@ -248,10 +248,10 @@ export function apply(ctx: ClientContext): void {
     inject: (): AtFileSectionInjected => ({
       hooks: { scope },
       setEnabled: async (enabled: boolean) => { await updateSettings({ field: 'enabled', value: enabled }) },
-      setIgnoreFiles: async (ignoreFiles: readonly string[]) => {
+      setIgnoreFiles: async (ignoreFiles: readonly FileIgnoreRuleInput[]) => {
         await updateSettings({ field: 'ignoreFiles', value: [...ignoreFiles] })
       },
-      setWorkspaceIgnoreFiles: async (workspace: string, ignoreFiles: readonly string[]) => {
+      setWorkspaceIgnoreFiles: async (workspace: string, ignoreFiles: readonly FileIgnoreRuleInput[]) => {
         const current = normalizeWorkspaceIgnoreFiles(scope.getSnapshot().value.workspaceIgnoreFiles)
         const target = workspacePathKey(workspace)
         const next = current.filter(entry => workspacePathKey(entry.workspace) !== target)

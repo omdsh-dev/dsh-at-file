@@ -1,12 +1,12 @@
-import type { FileEntry } from './contract.ts';
+import type { FileEntry, FileIgnoreRuleInput } from './contract.ts';
 /** Options for one bounded index pass. */
 export interface IndexOptions {
     /** Hard cap on collected files. */
     readonly maxFiles: number;
     /** Directory basenames the walk skips (children never enqueue). */
     readonly ignoreDirs: readonly string[];
-    /** File basenames omitted from the index, matched case-insensitively. */
-    readonly ignoreFiles: readonly string[];
+    /** Exact and Regex basename filters applied before files enter the index. */
+    readonly ignoreFiles: readonly FileIgnoreRuleInput[];
 }
 /** One index pass result: the sorted file list plus the honest truncation flag. */
 export interface WorkspaceIndex {

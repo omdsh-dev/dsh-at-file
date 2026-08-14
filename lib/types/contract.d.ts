@@ -13,20 +13,28 @@ export interface FileEntry {
     readonly relative: string;
     readonly kind: 'file' | 'dir';
 }
+/** One file filter. Legacy string values remain accepted as exact, insensitive rules. */
+export interface FileIgnoreRule {
+    readonly kind: 'exact' | 'regex';
+    readonly pattern: string;
+    readonly caseSensitive: boolean;
+}
+/** Durable and wire-compatible input for one file filter. */
+export type FileIgnoreRuleInput = string | FileIgnoreRule;
 /** File-name filters attached to one canonical workspace path. */
 export interface WorkspaceIgnoreFiles {
     /** Canonical workspace directory path supplied by the Harness. */
     readonly workspace: string;
     /** Additional basenames ignored only inside this workspace. */
-    readonly ignoreFiles: string[];
+    readonly ignoreFiles: FileIgnoreRuleInput[];
 }
 /** The `at-file` settings namespace's durable shape (host and client share it). */
 export interface AtFileSettings {
     /** Whether the @file surface is enabled; false hides picker, dock, and reference injection. */
     readonly enabled: boolean;
-    /** File basenames excluded from every workspace index, matched case-insensitively. */
-    readonly ignoreFiles: string[];
-    /** Workspace-specific basenames added to the global filters. */
+    /** Global Exact and Regex basename filters; legacy strings are insensitive Exact rules. */
+    readonly ignoreFiles: FileIgnoreRuleInput[];
+    /** Workspace-specific filters added to the global filters. */
     readonly workspaceIgnoreFiles: WorkspaceIgnoreFiles[];
 }
 /** One field update sent through the plugin-owned settings Remote. */
@@ -35,7 +43,7 @@ export type AtFileSettingsUpdate = {
     readonly value: boolean;
 } | {
     readonly field: 'ignoreFiles';
-    readonly value: string[];
+    readonly value: FileIgnoreRuleInput[];
 } | {
     readonly field: 'workspaceIgnoreFiles';
     readonly value: WorkspaceIgnoreFiles[];
@@ -51,18 +59,57 @@ export declare const fileEntrySchema: z.ZodReadonly<z.ZodObject<{
         dir: "dir";
     }>;
 }, z.core.$strip>>;
+/** Strict wire codec for one structured file filter. */
+export declare const fileIgnoreRuleSchema: z.ZodReadonly<z.ZodObject<{
+    kind: z.ZodEnum<{
+        exact: "exact";
+        regex: "regex";
+    }>;
+    pattern: z.ZodString;
+    caseSensitive: z.ZodBoolean;
+}, z.core.$strip>>;
+/** Strict wire codec accepting both legacy strings and structured filters. */
+export declare const fileIgnoreRuleInputSchema: z.ZodUnion<readonly [z.ZodString, z.ZodReadonly<z.ZodObject<{
+    kind: z.ZodEnum<{
+        exact: "exact";
+        regex: "regex";
+    }>;
+    pattern: z.ZodString;
+    caseSensitive: z.ZodBoolean;
+}, z.core.$strip>>]>;
 /** Strict wire codec for one workspace-specific filter row. */
 export declare const workspaceIgnoreFilesSchema: z.ZodReadonly<z.ZodObject<{
     workspace: z.ZodString;
-    ignoreFiles: z.ZodArray<z.ZodString>;
+    ignoreFiles: z.ZodArray<z.ZodUnion<readonly [z.ZodString, z.ZodReadonly<z.ZodObject<{
+        kind: z.ZodEnum<{
+            exact: "exact";
+            regex: "regex";
+        }>;
+        pattern: z.ZodString;
+        caseSensitive: z.ZodBoolean;
+    }, z.core.$strip>>]>>;
 }, z.core.$strip>>;
 /** Strict wire codec for the resolved at-file settings section. */
 export declare const atFileSettingsSchema: z.ZodReadonly<z.ZodObject<{
     enabled: z.ZodBoolean;
-    ignoreFiles: z.ZodArray<z.ZodString>;
+    ignoreFiles: z.ZodArray<z.ZodUnion<readonly [z.ZodString, z.ZodReadonly<z.ZodObject<{
+        kind: z.ZodEnum<{
+            exact: "exact";
+            regex: "regex";
+        }>;
+        pattern: z.ZodString;
+        caseSensitive: z.ZodBoolean;
+    }, z.core.$strip>>]>>;
     workspaceIgnoreFiles: z.ZodArray<z.ZodReadonly<z.ZodObject<{
         workspace: z.ZodString;
-        ignoreFiles: z.ZodArray<z.ZodString>;
+        ignoreFiles: z.ZodArray<z.ZodUnion<readonly [z.ZodString, z.ZodReadonly<z.ZodObject<{
+            kind: z.ZodEnum<{
+                exact: "exact";
+                regex: "regex";
+            }>;
+            pattern: z.ZodString;
+            caseSensitive: z.ZodBoolean;
+        }, z.core.$strip>>]>>;
     }, z.core.$strip>>>;
 }, z.core.$strip>>;
 /** Strict wire codec for one field update. */
@@ -71,12 +118,26 @@ export declare const atFileSettingsUpdateSchema: z.ZodDiscriminatedUnion<[z.ZodR
     value: z.ZodBoolean;
 }, z.core.$strip>>, z.ZodReadonly<z.ZodObject<{
     field: z.ZodLiteral<"ignoreFiles">;
-    value: z.ZodArray<z.ZodString>;
+    value: z.ZodArray<z.ZodUnion<readonly [z.ZodString, z.ZodReadonly<z.ZodObject<{
+        kind: z.ZodEnum<{
+            exact: "exact";
+            regex: "regex";
+        }>;
+        pattern: z.ZodString;
+        caseSensitive: z.ZodBoolean;
+    }, z.core.$strip>>]>>;
 }, z.core.$strip>>, z.ZodReadonly<z.ZodObject<{
     field: z.ZodLiteral<"workspaceIgnoreFiles">;
     value: z.ZodArray<z.ZodReadonly<z.ZodObject<{
         workspace: z.ZodString;
-        ignoreFiles: z.ZodArray<z.ZodString>;
+        ignoreFiles: z.ZodArray<z.ZodUnion<readonly [z.ZodString, z.ZodReadonly<z.ZodObject<{
+            kind: z.ZodEnum<{
+                exact: "exact";
+                regex: "regex";
+            }>;
+            pattern: z.ZodString;
+            caseSensitive: z.ZodBoolean;
+        }, z.core.$strip>>]>>;
     }, z.core.$strip>>>;
 }, z.core.$strip>>], "field">;
 /** The atFile Remote namespace's strict invocation descriptors. */

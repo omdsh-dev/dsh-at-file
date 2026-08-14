@@ -22,7 +22,7 @@ src/client/         browser half, served as the single file /plugins/dsh-at-file
   icons.tsx         built-in SVG icons selected from the indexed path type and extension
   FolderNavigator.tsx  ArrowRight directory traversal that keeps the @ candidate menu active
   FilesDock.tsx     input.dock rows parsed from the draft's @path tokens (open/remove)
-  SettingsSection.tsx  native enable checkbox plus Global/Workspace exact-basename filter manager
+  SettingsSection.tsx  native enable checkbox plus Global/Workspace Exact/Regex filter manager
 tests/              node-env specs; jsdom pragma on the browser specs
 ```
 
@@ -30,7 +30,7 @@ tests/              node-env specs; jsdom pragma on the browser specs
 
 - The wire endpoints are `atFile/search`, `atFile/getSettings`, and `atFile/updateSettings`. File content NEVER crosses the wire or the Host mention boundary: `agent/pre-step` validates each `@path` and injects only `<workspace-reference path="…" kind="file|directory" />` with source `at-file-mention`. The agent decides whether and how to inspect it with available tools.
 - The Host Gateway resolves the endpoint through the **strict Typert manifest** (`src/typert.ts`, registered via `ctx.typert.register`) — never through `@Remote` marker tables, because the harness's source-launch dev environment loads the gateway from protocol `src` while a profile-loaded plugin bundle loads protocol `lib` (two marker tables). The `@Remote` decorator stays for documentation and lib-consistent deployments.
-- The descriptor set lives in `src/contract.ts` and is shared verbatim by the host manifest and the client contribution; the agent lookup codec's `typeSymbol` must stay `@deepseek-ai/dsh-session/types#SessionId`.
+- The descriptor set lives in `src/contract.ts` and is shared verbatim by the host manifest and the client contribution; the agent lookup codec's `typeSymbol` must stay `@deepseek-ai/dsh-session/types#SessionId`. File filters accept legacy strings and structured `{ kind, pattern, caseSensitive }` rules. Legacy strings mean case-insensitive Exact matching.
 - The client composes only through the standing seams (`ctx.remote.$mount`, `inputTriggers.registerSource`, `ctx.slots.register`, `ctx.locale.register`, and a registrant-private `createSnapshotStore`). The mounted Remote namespace is resolved through `ctx.reflect.get('remote.atFile')` — NOT the dotted `ctx.remote.atFile` read, which walks the fiber chain and stops at the Loader's runtime-less forks (verified live; the store path resolves by isolation label).
 - The `@path` token grammar is `@[^\s@]+` and must stay identical between the client's dock/lexicon, the source's plain-text pick, and the Host's `scanMentions` (they are the recognition contract, not one copy).
 - The plugin registers the `at-file` namespace through `ctx.settings.register`, but the public DSH package does not expose that namespace through `WEB_SETTINGS_NAMESPACES`. Browser reads and writes MUST use `atFile/getSettings` and `atFile/updateSettings`; the Host methods own normalization and call the owner settings scope. This keeps the package self-contained and preserves the web profile's durable settings document.

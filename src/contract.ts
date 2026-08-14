@@ -15,28 +15,38 @@ export interface FileEntry {
   readonly kind: 'file' | 'dir'
 }
 
+/** One file filter. Legacy string values remain accepted as exact, insensitive rules. */
+export interface FileIgnoreRule {
+  readonly kind: 'exact' | 'regex'
+  readonly pattern: string
+  readonly caseSensitive: boolean
+}
+
+/** Durable and wire-compatible input for one file filter. */
+export type FileIgnoreRuleInput = string | FileIgnoreRule
+
 /** File-name filters attached to one canonical workspace path. */
 export interface WorkspaceIgnoreFiles {
   /** Canonical workspace directory path supplied by the Harness. */
   readonly workspace: string
   /** Additional basenames ignored only inside this workspace. */
-  readonly ignoreFiles: string[]
+  readonly ignoreFiles: FileIgnoreRuleInput[]
 }
 
 /** The `at-file` settings namespace's durable shape (host and client share it). */
 export interface AtFileSettings {
   /** Whether the @file surface is enabled; false hides picker, dock, and reference injection. */
   readonly enabled: boolean
-  /** File basenames excluded from every workspace index, matched case-insensitively. */
-  readonly ignoreFiles: string[]
-  /** Workspace-specific basenames added to the global filters. */
+  /** Global Exact and Regex basename filters; legacy strings are insensitive Exact rules. */
+  readonly ignoreFiles: FileIgnoreRuleInput[]
+  /** Workspace-specific filters added to the global filters. */
   readonly workspaceIgnoreFiles: WorkspaceIgnoreFiles[]
 }
 
 /** One field update sent through the plugin-owned settings Remote. */
 export type AtFileSettingsUpdate =
   | { readonly field: 'enabled'; readonly value: boolean }
-  | { readonly field: 'ignoreFiles'; readonly value: string[] }
+  | { readonly field: 'ignoreFiles'; readonly value: FileIgnoreRuleInput[] }
   | { readonly field: 'workspaceIgnoreFiles'; readonly value: WorkspaceIgnoreFiles[] }
 
 /** Wire codec: one session identity (branded string on the wire). */
@@ -49,23 +59,42 @@ export const fileEntrySchema = z.object({
   kind: z.enum(['file', 'dir']),
 }).readonly()
 
+/** Strict wire codec for one structured file filter. */
+export const fileIgnoreRuleSchema = z.object({
+  kind: z.enum(['exact', 'regex']),
+  pattern: z.string().min(1),
+  caseSensitive: z.boolean(),
+}).readonly().superRefine((rule, context) => {
+  if (rule.kind !== 'regex') return
+  try {
+    new RegExp(rule.pattern, rule.caseSensitive ? '' : 'i')
+  } catch (error) {
+    /* v8 ignore next -- RegExp construction throws an Error in supported runtimes. */
+    const message = error instanceof Error ? error.message : 'Invalid regular expression'
+    context.addIssue({ code: 'custom', message })
+  }
+})
+
+/** Strict wire codec accepting both legacy strings and structured filters. */
+export const fileIgnoreRuleInputSchema = z.union([z.string(), fileIgnoreRuleSchema])
+
 /** Strict wire codec for one workspace-specific filter row. */
 export const workspaceIgnoreFilesSchema = z.object({
   workspace: z.string().min(1),
-  ignoreFiles: z.array(z.string()),
+  ignoreFiles: z.array(fileIgnoreRuleInputSchema),
 }).readonly()
 
 /** Strict wire codec for the resolved at-file settings section. */
 export const atFileSettingsSchema = z.object({
   enabled: z.boolean(),
-  ignoreFiles: z.array(z.string()),
+  ignoreFiles: z.array(fileIgnoreRuleInputSchema),
   workspaceIgnoreFiles: z.array(workspaceIgnoreFilesSchema),
 }).readonly()
 
 /** Strict wire codec for one field update. */
 export const atFileSettingsUpdateSchema = z.discriminatedUnion('field', [
   z.object({ field: z.literal('enabled'), value: z.boolean() }).readonly(),
-  z.object({ field: z.literal('ignoreFiles'), value: z.array(z.string()) }).readonly(),
+  z.object({ field: z.literal('ignoreFiles'), value: z.array(fileIgnoreRuleInputSchema) }).readonly(),
   z.object({
     field: z.literal('workspaceIgnoreFiles'),
     value: z.array(workspaceIgnoreFilesSchema),

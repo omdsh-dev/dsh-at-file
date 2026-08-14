@@ -27,14 +27,23 @@ export declare const zh: {
     'settings.emptyGlobal': string;
     'settings.emptyWorkspace': string;
     'settings.namePlaceholder': string;
+    'settings.regexPlaceholder': string;
     'settings.nameHint': string;
+    'settings.regexHint': string;
     'settings.invalidName': string;
+    'settings.invalidRegex': string;
     'settings.duplicateName': string;
     'settings.inheritedName': string;
     'settings.add': string;
     'settings.saving': string;
     'settings.remove': string;
     'settings.inherited': string;
+    'settings.ruleType': string;
+    'settings.kind.exact': string;
+    'settings.kind.regex': string;
+    'settings.caseSensitive': string;
+    'settings.caseInsensitive': string;
+    'settings.caseSensitiveOption': string;
 };
 /** The `at-file` namespace key union. */
 export type AtFileKey = keyof typeof zh;
@@ -63,14 +72,23 @@ export declare const en: {
     'settings.emptyGlobal': string;
     'settings.emptyWorkspace': string;
     'settings.namePlaceholder': string;
+    'settings.regexPlaceholder': string;
     'settings.nameHint': string;
+    'settings.regexHint': string;
     'settings.invalidName': string;
+    'settings.invalidRegex': string;
     'settings.duplicateName': string;
     'settings.inheritedName': string;
     'settings.add': string;
     'settings.saving': string;
     'settings.remove': string;
     'settings.inherited': string;
+    'settings.ruleType': string;
+    'settings.kind.exact': string;
+    'settings.kind.regex': string;
+    'settings.caseSensitive': string;
+    'settings.caseInsensitive': string;
+    'settings.caseSensitiveOption': string;
 };
 /** Locale namespace id registered under ctx.locale. */
 export declare const NS = "at-file";

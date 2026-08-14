@@ -39,10 +39,10 @@ The default index skips common version-control directories, IDE metadata, depend
 ## Install or Update
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.5.1.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.0.tar.gz
 ```
 
-Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.5.1`.
+Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.6.0`.
 
 ## File Filters
 
@@ -51,9 +51,15 @@ Open **Settings -> File mentions** to manage file-name filters.
 - **Global** contains rules shared by every workspace.
 - **Workspace** contains additional rules for the selected workspace path. Each workspace keeps its own list, and the panel shows the global rules it inherits.
 
-Each rule matches one complete basename, without case sensitivity. Add and remove rules individually. **Restore defaults** resets the global list to the built-in file names. **Clear workspace rules** removes only the selected workspace's additions.
+Each rule has its own matching mode and case setting:
 
-Settings are saved in the DSH web profile through the plugin's own Host connection. Existing `ignoreFiles` values from `0.4.1` remain in the global list after updating. A change clears the affected index cache, so the next `@` search uses the saved rules.
+- **Exact** matches one complete basename. Path separators are not accepted.
+- **Regex** runs a JavaScript regular expression against the complete basename. It does not receive the parent directory or workspace path.
+- **Case-sensitive** can be enabled independently for any Exact or Regex rule. It is off by default.
+
+Rules are added and removed individually. An invalid regular expression is shown before saving and is also rejected by the Host. **Restore defaults** resets the global list to the built-in file names. **Clear workspace rules** removes only the selected workspace's additions.
+
+Settings are saved in the DSH web profile through the plugin's own Host connection. Existing string values in `ignoreFiles` and workspace lists continue to work as case-insensitive Exact rules. A change clears the affected index cache, so the next `@` search uses the saved rules.
 
 ## Configuration
 

@@ -8,6 +8,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { settingsNamespace, type SettingsScope } from '@deepseek-ai/dsh-settings'
 import type { AtFileSettings } from './contract.ts'
+import type { FileIgnoreRule } from './contract.ts'
 import { DEFAULT_IGNORE_FILES } from './defaults.ts'
 
 /** The branded namespace name (the Web allowlist must list the same string). */
@@ -16,10 +17,24 @@ export const AT_FILE_NAMESPACE = settingsNamespace('at-file')
 /** Schemastery schema of the `at-file` namespace section. */
 export const AtFileSettingsSchema: z<AtFileSettings> = z.object({
   enabled: z.boolean().default(true),
-  ignoreFiles: z.array(z.string()).default([...DEFAULT_IGNORE_FILES]),
+  ignoreFiles: z.array(z.union([
+    z.string(),
+    z.object({
+      kind: z.union(['exact', 'regex'] as const),
+      pattern: z.string(),
+      caseSensitive: z.boolean(),
+    }) as z<FileIgnoreRule>,
+  ])).default([...DEFAULT_IGNORE_FILES]),
   workspaceIgnoreFiles: z.array(z.object({
     workspace: z.string(),
-    ignoreFiles: z.array(z.string()),
+    ignoreFiles: z.array(z.union([
+      z.string(),
+      z.object({
+        kind: z.union(['exact', 'regex'] as const),
+        pattern: z.string(),
+        caseSensitive: z.boolean(),
+      }) as z<FileIgnoreRule>,
+    ])),
   })).default([]),
 })
 

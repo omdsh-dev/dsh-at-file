@@ -1,8 +1,12 @@
 /** Filter normalization shared by the Host and browser settings surface. */
 import { describe, expect, it } from 'vitest'
 import {
+  compileIgnoreRules,
   effectiveIgnoreFiles,
+  ignoreRuleKey,
   ignoreFilesSettingsKey,
+  normalizeIgnoreFiles,
+  normalizeIgnoreRule,
   normalizeWorkspaceIgnoreFiles,
   workspaceIgnoreFilesFor,
   workspacePathKey,
@@ -19,6 +23,32 @@ function settings(over: Partial<AtFileSettings> = {}): AtFileSettings {
 }
 
 describe('workspace file filters', () => {
+  it('normalizes legacy and structured rules while preserving their wire shape', () => {
+    expect(normalizeIgnoreFiles([
+      ' Legacy.tmp ',
+      'legacy.TMP',
+      { kind: 'exact', pattern: 'Case.tmp', caseSensitive: true },
+      { kind: 'regex', pattern: ' \\.map$ ', caseSensitive: false },
+      { kind: 'regex', pattern: '\\.map$', caseSensitive: false },
+      '',
+      { kind: 'exact', pattern: ' ', caseSensitive: false },
+    ])).toEqual([
+      'Legacy.tmp',
+      { kind: 'exact', pattern: 'Case.tmp', caseSensitive: true },
+      { kind: 'regex', pattern: '\\.map$', caseSensitive: false },
+    ])
+    expect(normalizeIgnoreRule('')).toBeUndefined()
+    expect(ignoreRuleKey('')).toBe('')
+    expect(compileIgnoreRules(['one.tmp'])).toEqual([
+      { kind: 'exact', pattern: 'one.tmp', caseSensitive: false },
+    ])
+  })
+
+  it('rejects invalid regular expressions during normalization', () => {
+    expect(() => normalizeIgnoreFiles([{ kind: 'regex', pattern: '[', caseSensitive: false }]))
+      .toThrow(/Invalid regular expression/)
+  })
+
   it('normalizes Windows separators, drive casing, and trailing slashes', () => {
     expect(workspacePathKey('C:\\Users\\Liang\\Project\\')).toBe('c:/users/liang/project')
     expect(workspacePathKey('c:/users/liang/project')).toBe('c:/users/liang/project')
@@ -82,5 +112,10 @@ describe('workspace file filters', () => {
     })))
     expect(ignoreFilesSettingsKey({ enabled: true, ignoreFiles: ['legacy.tmp'] } as AtFileSettings))
       .toBe(ignoreFilesSettingsKey(settings({ ignoreFiles: ['legacy.tmp'] })))
+    expect(ignoreFilesSettingsKey(settings({
+      ignoreFiles: [{ kind: 'regex', pattern: '\\.TS$', caseSensitive: true }],
+    }))).not.toBe(ignoreFilesSettingsKey(settings({
+      ignoreFiles: [{ kind: 'regex', pattern: '\\.TS$', caseSensitive: false }],
+    })))
   })
 })

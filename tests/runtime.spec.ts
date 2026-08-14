@@ -69,6 +69,21 @@ describe('dsh-at-file host composition', () => {
       ignoreFiles: ['desktop.ini'],
       workspaceIgnoreFiles: [],
     })
+    expect(AtFileSettingsSchema({
+      enabled: true,
+      ignoreFiles: [{ kind: 'regex', pattern: '\\.map$', caseSensitive: false }],
+      workspaceIgnoreFiles: [{
+        workspace: '/work',
+        ignoreFiles: [{ kind: 'exact', pattern: 'Case.tmp', caseSensitive: true }],
+      }],
+    })).toEqual({
+      enabled: true,
+      ignoreFiles: [{ kind: 'regex', pattern: '\\.map$', caseSensitive: false }],
+      workspaceIgnoreFiles: [{
+        workspace: '/work',
+        ignoreFiles: [{ kind: 'exact', pattern: 'Case.tmp', caseSensitive: true }],
+      }],
+    })
   })
 
   it('boots the plugin and registers the atFile service under its own key', async () => {
@@ -139,6 +154,16 @@ describe('dsh-at-file host composition', () => {
           ignoreFiles: ['first.tmp', 'SECOND.tmp'],
         }],
       })
+      expect(await runtime.updateSettings({
+        field: 'ignoreFiles',
+        value: [{ kind: 'regex', pattern: ' \\.map$ ', caseSensitive: false }],
+      })).toMatchObject({
+        ignoreFiles: [{ kind: 'regex', pattern: '\\.map$', caseSensitive: false }],
+      })
+      await expect(runtime.updateSettings({
+        field: 'ignoreFiles',
+        value: [{ kind: 'regex', pattern: '[', caseSensitive: false }],
+      })).rejects.toThrow(/Invalid regular expression/)
       expect(await runtime.updateSettings({ field: 'enabled', value: false }))
         .toMatchObject({ enabled: false })
     } finally {
