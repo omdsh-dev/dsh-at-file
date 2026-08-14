@@ -12,12 +12,14 @@ src/contract.ts     one shared descriptor set + zod codecs + FileEntry/settings 
 src/typert.ts       strict host Typert manifest, registered via ctx.typert.register
 src/settings.ts     the `at-file` settings namespace (enable switch)
 src/files.ts        bounded workspace path index walk over node:fs
+src/defaults.ts     built-in ignored directory names for IDE metadata, caches, dependencies, and build output
 src/invariant.ts    ./invariant companion (real `No runtime invariant:` reason)
 src/client/         browser half, served as the single file /plugins/dsh-at-file/client.js
   index.ts          apply: $mount the Remote contribution, register the @ source + dock + section + locale + styles
   remote.ts         hand-written TypertRemoteContribution + ctx.remote.atFile type merges
   source.ts         InputTriggerSource factory (per-session index cache, plain-text @path picks)
-  search.ts         pure ranking (subsequence match, basename tier, dirs-first default)
+  search.ts         filename ranking, ordered path-segment queries, and dirs-first default browsing
+  icons.tsx         built-in SVG icons selected from the indexed path type and extension
   FilesDock.tsx     input.dock rows parsed from the draft's @path tokens (open/remove)
   SettingsSection.tsx  one labeled native enable checkbox over the settings scope
 tests/              node-env specs; jsdom pragma on the browser specs

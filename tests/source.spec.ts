@@ -8,6 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ClientSessionContext } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { createAtFileSource, INDEX_TTL_MS, MAX_CANDIDATES, SOURCE_NAME } from '../src/client/source.ts'
 import type { FileEntry } from '../src/client/remote.ts'
+import { fileIconKind } from '../src/client/icons.tsx'
 import { fmt } from '../src/client/locales.ts'
 
 const sid = (value: string): SessionId => value as SessionId
@@ -31,28 +32,55 @@ describe('@file candidates', () => {
   it('fetches the session index once and filters per keystroke locally', async () => {
     const { source, search } = harness()
     const first = await source.candidates(session('s1'), { query: 'view', position: 'inline', signal: new AbortController().signal })
-    expect(first.map(item => item.name)).toEqual(['src/client/view.ts'])
+    expect(first.map(item => item.name)).toEqual(['view.ts'])
     const second = await source.candidates(session('s1'), { query: 'README', position: 'inline', signal: new AbortController().signal })
     expect(second.map(item => item.name)).toEqual(['README.md'])
     expect(search).toHaveBeenCalledTimes(1)
   })
 
-  it('splits the row into the relative name, its directory, and the kind icon', async () => {
+  it('shows the basename first while retaining the full relative path as its value', async () => {
     const { source } = harness()
     const rows = await source.candidates(session('s1'), { query: 'view', position: 'inline', signal: new AbortController().signal })
-    expect(rows).toEqual([{ name: 'src/client/view.ts', icon: '📄', description: 'src/client' }])
+    expect(rows[0]).toMatchObject({ name: 'view.ts', value: 'src/client/view.ts', description: 'src/client' })
+    expect(fileIconKind(FILES[3]!)).toBe('code')
   })
 
-  it('marks directories with a folder icon and omits a root-level description', async () => {
+  it('keeps a directory value and omits a root-level description', async () => {
     const { source } = harness()
     const rows = await source.candidates(session('s1'), { query: 'src', position: 'inline', signal: new AbortController().signal })
-    expect(rows).toContainEqual({ name: 'src', icon: '📁' })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ name: 'src', value: 'src' })
+    expect(rows[0]!.description).toBeUndefined()
   })
 
   it('omits the directory description for root-level files', async () => {
     const { source } = harness()
     const rows = await source.candidates(session('s1'), { query: 'README', position: 'inline', signal: new AbortController().signal })
-    expect(rows).toEqual([{ name: 'README.md', icon: '📄' }])
+    expect(rows[0]).toMatchObject({ name: 'README.md', value: 'README.md' })
+    expect(rows[0]!.description).toBeUndefined()
+  })
+
+  it('adds the parent directory to duplicate basename labels', async () => {
+    const duplicates: readonly FileEntry[] = [
+      { path: '/ws/src/view.ts', relative: 'src/view.ts', kind: 'file' },
+      { path: '/ws/tests/view.ts', relative: 'tests/view.ts', kind: 'file' },
+    ]
+    const { source } = harness({ search: vi.fn(async () => duplicates) })
+    const rows = await source.candidates(session('s1'), { query: 'view', position: 'inline', signal: new AbortController().signal })
+    expect(rows.map(row => ({ name: row.name, value: row.value, description: row.description }))).toEqual([
+      { name: 'view.ts - src', value: 'src/view.ts', description: 'src' },
+      { name: 'view.ts - tests', value: 'tests/view.ts', description: 'tests' },
+    ])
+  })
+
+  it('keeps a root-level duplicate label concise', async () => {
+    const duplicates: readonly FileEntry[] = [
+      { path: '/ws/view.ts', relative: 'view.ts', kind: 'file' },
+      { path: '/ws/src/view.ts', relative: 'src/view.ts', kind: 'file' },
+    ]
+    const { source } = harness({ search: vi.fn(async () => duplicates) })
+    const rows = await source.candidates(session('s1'), { query: 'view', position: 'inline', signal: new AbortController().signal })
+    expect(rows.map(row => row.name)).toEqual(['view.ts', 'view.ts - src'])
   })
 
   it('joins an in-flight fresh fetch instead of refetching', async () => {
@@ -140,7 +168,7 @@ describe('@file picks', () => {
     const { source } = harness()
     await source.candidates(session('s1'), { query: 'view', position: 'inline', signal: new AbortController().signal })
     const outcome = source.onPick({
-      candidate: { name: 'src/client/view.ts', icon: '📄', description: 'src/client' },
+      candidate: { name: 'view.ts', value: 'src/client/view.ts', description: 'src/client' },
       session: session('s1'),
       position: 'inline',
       via: 'menu',
@@ -153,7 +181,7 @@ describe('@file picks', () => {
     const { source } = harness()
     await source.candidates(session('s1'), { query: 'src', position: 'inline', signal: new AbortController().signal })
     const outcome = source.onPick({
-      candidate: { name: 'src', icon: '📁' },
+      candidate: { name: 'src', value: 'src' },
       session: session('s1'),
       position: 'inline',
       via: 'menu',
@@ -165,7 +193,18 @@ describe('@file picks', () => {
   it('misses cleanly when the candidate no longer resolves', () => {
     const { source } = harness()
     expect(source.onPick({
-      candidate: { name: 'gone.ts' },
+      candidate: { name: 'gone.ts', value: 'gone.ts' },
+      session: session('s1'),
+      position: 'inline',
+      via: 'menu',
+      span: { start: 0, end: 1, draftRev: 1 },
+    })).toBeUndefined()
+  })
+
+  it('misses cleanly when a candidate has no source-owned value', () => {
+    const { source } = harness()
+    expect(source.onPick({
+      candidate: { name: 'view.ts' },
       session: session('s1'),
       position: 'inline',
       via: 'menu',

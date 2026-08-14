@@ -24,13 +24,23 @@ File format and file size do not change this behavior. A PDF follows the same pa
 
 This mechanism applies to version `0.3.0` and later. Earlier releases read file content during submission and enforced file-size limits.
 
+## Path Picker
+
+Plain queries match filenames. Exact names, prefixes, and compact matches rank ahead of looser results, without matching letters scattered across a long directory path.
+
+A query containing `/` matches path segments in order. For example, `src/view` can find `src/client/view.ts`. A trailing slash such as `src/` searches within that path.
+
+Each result shows the filename first and its parent directory underneath. Duplicate filenames include the parent directory in the main label. Built-in SVG icons distinguish folders, source files, text, PDFs, images, data and configuration files, archives, and other files.
+
+The default index skips common version-control directories, IDE metadata, dependency trees, caches, and build output. The list covers VS Code, Visual Studio, JetBrains IDEs, Fleet, Eclipse, Android and Gradle, Xcode, CMake, Flutter, .NET, Unity, Unreal, and common JavaScript and Python output directories.
+
 ## Install or Update
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.3.0.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.3.1.tar.gz
 ```
 
-Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.3.0`.
+Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.3.1`.
 
 The plugin can be enabled or disabled under **Settings -> File mentions**.
 
@@ -39,18 +49,17 @@ The plugin can be enabled or disabled under **Settings -> File mentions**.
 The available options apply to the path picker index:
 
 - `maxIndexedFiles` sets the maximum number of indexed workspace entries.
-- `ignoreDirs` lists directory names excluded from the picker.
+- `ignoreDirs` replaces the built-in list of directory names excluded from the picker. Set it to `[]` to index every directory.
 
 Add the complete configuration to the selected profile's `cordis.patch.yml`. The usual path is `~/.dsh/profiles/web/cordis.patch.yml`.
 
 ```yaml
 - id: dsh-at-file
   config:
-    maxIndexedFiles: 5000
-    ignoreDirs: ['.git', 'node_modules']
+    maxIndexedFiles: 10000
 ```
 
-A profile patch replaces the complete `config` object. Keep both fields when changing either value.
+Omitting `ignoreDirs` keeps the built-in list. When you provide it, include every directory name you want excluded.
 
 ## Path Handling
 

@@ -137,8 +137,9 @@ describe('dsh-at-file host composition', () => {
   it('validates configuration through the exported schema', () => {
     expect(plugin.Config({})).toEqual({
       maxIndexedFiles: 5000,
-      ignoreDirs: ['.git', 'node_modules'],
+      ignoreDirs: [...plugin.DEFAULT_IGNORE_DIRS],
     })
+    expect(plugin.Config({ ignoreDirs: [] }).ignoreDirs).toEqual([])
     expect(() => plugin.Config({ maxIndexedFiles: 0 })).toThrow()
   })
 })

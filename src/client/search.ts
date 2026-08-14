@@ -1,14 +1,12 @@
 /**
- * Pure file-search ranking for the @file menu: case-insensitive subsequence
- * matching over the workspace-relative path, with basename matches ranked
- * above full-path matches and earlier match positions above later ones. The
- * empty query falls back to directories first (so the picker reads as a
- * browsable tree, not a root-file list), then files, each alphabetical. Zero
- * DOM, zero cordis — the per-keystroke filter runs on the client's cached index.
+ * Pure file-search ranking for the @file menu. A plain query matches basenames
+ * only, so letters spread across a long generated path cannot create false
+ * positives. Queries containing a slash match path segments in order. The
+ * empty query remains a directory-first alphabetical browse view.
  */
 import type { FileEntry } from './remote.ts'
 
-/** Ranked top-N files matching `query` (ties break by kind, length, then lexicographically). */
+/** Ranked top-N paths matching `query` (ties break by kind, length, then path). */
 export function rankFiles(
   files: readonly FileEntry[],
   query: string,
@@ -37,38 +35,53 @@ function byDefault(a: FileEntry, b: FileEntry): number {
   return a.relative < b.relative ? -1 : 1
 }
 
-/**
- * Match score for one path against one normalized query; -1 means no match.
- * A basename subsequence wins over a full-path one, and the earliest greedy
- * match position wins inside each tier (a basename prefix match ranks top).
- * @param path - workspace-relative path with forward slashes.
- * @param q - lowercased trimmed query.
- * @returns non-negative score, or -1 when the query is not a subsequence.
- */
+/** Match one normalized query against a basename or an ordered path segment list. */
 function scorePath(path: string, q: string): number {
-  const lower = path.toLowerCase()
-  const base = lower.slice(lower.lastIndexOf('/') + 1)
-  const inBase = subsequenceIndices(base, q)
-  if (inBase !== null) return 2000 - inBase[0]
-  const inPath = subsequenceIndices(lower, q)
-  if (inPath !== null) return 1000 - inPath[0] - path.length
-  return -1
+  const pathSegments = path.toLowerCase().split('/')
+  const normalizedQuery = q.replaceAll('\\', '/')
+  const querySegments = normalizedQuery.split('/').filter(Boolean)
+  if (!normalizedQuery.includes('/')) return scoreName(pathSegments.at(-1) as string, querySegments[0] as string)
+  if (querySegments.length === 0) return -1
+
+  let cursor = 0
+  let total = 0
+  let lastMatch = -1
+  for (const querySegment of querySegments) {
+    let matchedIndex = -1
+    let matchedScore = -1
+    for (let index = cursor; index < pathSegments.length; index++) {
+      const score = scoreName(pathSegments[index] as string, querySegment)
+      if (score < 0) continue
+      matchedScore = score
+      matchedIndex = index
+      break
+    }
+    if (matchedIndex < 0) return -1
+    total += matchedScore
+    lastMatch = matchedIndex
+    cursor = matchedIndex + 1
+  }
+  const basenameBonus = lastMatch === pathSegments.length - 1 ? 1000 : 0
+  return total + basenameBonus - path.length
 }
 
-/**
- * Greedy earliest subsequence match of `needle` inside `hay`.
- * @returns the matched indices, or null when `needle` is not a subsequence.
- */
-function subsequenceIndices(hay: string, needle: string): readonly number[] | null {
-  /* v8 ignore next -- rankFiles guards the empty query before any score call. */
-  if (needle === '') return []
-  const indices: number[] = []
+/** Exact, prefix, substring, then compact subsequence scoring for one name. */
+function scoreName(name: string, query: string): number {
+  if (name === query) return 5000
+  if (name.startsWith(query)) return 4500 - name.length
+  const contained = name.indexOf(query)
+  if (contained >= 0) return 4000 - contained * 10 - name.length
+  let first = -1
+  let previous = -1
+  let gaps = 0
   let at = 0
-  for (const ch of needle) {
-    const found = hay.indexOf(ch, at)
-    if (found < 0) return null
-    indices.push(found)
+  for (const ch of query) {
+    const found = name.indexOf(ch, at)
+    if (found < 0) return -1
+    if (first < 0) first = found
+    if (previous >= 0) gaps += found - previous - 1
+    previous = found
     at = found + 1
   }
-  return indices
+  return 3000 - first * 10 - gaps * 5 - name.length
 }

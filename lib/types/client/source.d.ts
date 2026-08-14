@@ -10,6 +10,12 @@
 import type { InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client';
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client';
 import type { FileEntry } from './remote.ts';
+declare module '@deepseek-ai/dsh-client-ui-input-trigger/client' {
+    interface InputTriggerCandidate {
+        /** Source-owned stable value when the visible name is only a display label. */
+        readonly value?: string;
+    }
+}
 /** Owner source name (the lexicon and decoration routing key). */
 export declare const SOURCE_NAME = "at-file";
 /** Design cap on visible picker rows (menu height mirrors the slash menu). */

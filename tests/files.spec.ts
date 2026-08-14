@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { indexWorkspace } from '../src/files.ts'
+import { DEFAULT_IGNORE_DIRS } from '../src/defaults.ts'
 
 /** Build a fresh fixture tree and hand back its root (caller removes it). */
 async function fixture(): Promise<string> {
@@ -55,6 +56,31 @@ describe('indexWorkspace', () => {
       expect(relatives.some(path => path.includes('node_modules'))).toBe(false)
       expect(relatives.some(path => path.includes('.git'))).toBe(false)
       expect(relatives.some(path => path.startsWith('linked-src'))).toBe(false)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('default ignores remove common IDE metadata, caches, dependencies, and build output', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-default-ignore-'))
+    const ignored = [
+      '.idea', '.vs', '.vscode', '.settings', '.gradle', '.cxx', 'build', 'bin', 'target',
+      'cmake-build-debug', '.pytest_cache', 'DerivedData', 'node_modules',
+    ]
+    try {
+      for (const directory of ignored) {
+        await mkdir(join(root, directory), { recursive: true })
+        await writeFile(join(root, directory, 'noise.txt'), 'noise\n')
+      }
+      await mkdir(join(root, 'src'), { recursive: true })
+      await writeFile(join(root, 'src', 'main.kt'), 'fun main() {}\n')
+
+      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: DEFAULT_IGNORE_DIRS })
+      const relatives = files.map(file => file.relative)
+      expect(relatives).toContain('src/main.kt')
+      for (const directory of ignored) {
+        expect(relatives.some(path => path === directory || path.startsWith(`${directory}/`))).toBe(false)
+      }
     } finally {
       await rm(root, { recursive: true, force: true })
     }
