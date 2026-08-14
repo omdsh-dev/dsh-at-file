@@ -2,5 +2,8 @@ packages:
   - '.'
 autoInstallPeers: false
 nodeLinker: hoisted
+minimumReleaseAge: 10080
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
 allowBuilds:
   esbuild: true
