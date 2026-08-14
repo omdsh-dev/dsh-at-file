@@ -4,17 +4,21 @@
  * is the user's path link before and after send: clicking the path opens the
  * file on the host, the × removes the token from the draft. The draft holds
  * plain-text @path tokens (the plain-text-reference decision), so the dock
- * parses them directly; the settings scope's live enable value gates the
- * strip.
+ * parses them directly; the plugin settings source's live enable value gates
+ * the strip.
  */
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client';
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
 import type { AtFileSettings } from '../contract.ts';
-/** Injected business face: open one relative path, and the live settings scope. */
+export interface AtFileSettingsSnapshot {
+    readonly value: AtFileSettings;
+}
+export type AtFileSettingsSource = ObservableSnapshot<AtFileSettingsSnapshot>;
+/** Injected business face: open one relative path, and the live settings source. */
 export interface AtFileDockInjected {
     onOpen: (relative: string) => void;
     hooks: {
-        scope: SettingsScope<AtFileSettings>;
+        scope: AtFileSettingsSource;
     };
 }
 /** Full dock entry props: InputZone owner share + session standard kit + injected face + locale seat. */

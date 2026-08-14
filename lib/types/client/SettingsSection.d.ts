@@ -1,11 +1,10 @@
 /** Settings section for global and workspace-specific file-name filters. */
 import type { PropsLocale, PropsRuntime, InjectFace } from '@deepseek-ai/dsh-client-ui-slots';
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client';
-import type { AtFileSettings } from '../contract.ts';
+import type { AtFileSettingsSource } from './FilesDock.tsx';
 /** Injected business face: the live scope and durable write verbs. */
 export interface AtFileSectionInjected {
     hooks: {
-        scope: SettingsScope<AtFileSettings>;
+        scope: AtFileSettingsSource;
     };
     setEnabled: (enabled: boolean) => Promise<void>;
     setIgnoreFiles: (ignoreFiles: readonly string[]) => Promise<void>;

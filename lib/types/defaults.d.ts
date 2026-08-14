@@ -3,6 +3,8 @@ import type { AtFileSettings, WorkspaceIgnoreFiles } from './contract.ts';
 export declare const DEFAULT_IGNORE_DIRS: readonly [".git", ".hg", ".svn", ".idea", ".vs", ".vscode", ".fleet", ".history", ".metadata", ".settings", "node_modules", "bower_components", "vendor", "Pods", ".gradle", ".kotlin", ".cxx", ".externalNativeBuild", ".dart_tool", ".swiftpm", ".build", ".cache", ".parcel-cache", ".turbo", ".nx", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".venv", "venv", ".next", ".nuxt", ".output", ".svelte-kit", ".angular", "build", "bin", "dist", "out", "target", "obj", "coverage", "DerivedData", "xcuserdata", "CMakeFiles", "cmake-build-debug", "cmake-build-release", "cmake-build-relwithdebinfo", "cmake-build-minsizerel", "_deps", ".godot", "Library", "Temp", "Logs", "Binaries", "Intermediate", "Saved", "DerivedDataCache"];
 /** File basenames omitted from the picker unless the Web setting replaces the list. */
 export declare const DEFAULT_IGNORE_FILES: readonly ["desktop.ini", "Thumbs.db", ".DS_Store"];
+/** Fresh settings defaults for Host and browser initialization. */
+export declare function defaultAtFileSettings(): AtFileSettings;
 /** Trim file basenames and remove empty or case-insensitive duplicate entries. */
 export declare function normalizeIgnoreFiles(values: readonly string[]): string[];
 /** Stable comparison key for one canonical workspace path. */

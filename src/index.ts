@@ -18,7 +18,12 @@ import { AtFileRuntime } from './runtime.ts'
 import { TYPERT_MANIFEST } from './typert.ts'
 import { registerAtFileSettings } from './settings.ts'
 import { mentionPreStep } from './mention.ts'
-import { DEFAULT_IGNORE_DIRS } from './defaults.ts'
+import {
+  DEFAULT_IGNORE_DIRS,
+  normalizeIgnoreFiles,
+  normalizeWorkspaceIgnoreFiles,
+} from './defaults.ts'
+import type { AtFileSettingsUpdate } from './contract.ts'
 import type { ResolvedConfig } from './types.ts'
 
 /** Cordis plugin name (the Loader entry and client bundle id). */
@@ -58,9 +63,21 @@ export function apply(ctx: Context, config?: Config): void {
   // The durable enable switch: the runtime and the boundary read its live
   // value per call, so toggling it in the Web settings takes effect immediately.
   const settings = registerAtFileSettings(ctx)
-  const getSettings = () => settings.get()
-  const isEnabled = (): boolean => getSettings().enabled
-  new AtFileRuntime(ctx, resolved, getSettings)
+  const readSettings = () => settings.get()
+  const writeSettings = async (update: AtFileSettingsUpdate) => {
+    if (update.field === 'enabled') {
+      await settings.update({ enabled: update.value })
+    } else if (update.field === 'ignoreFiles') {
+      await settings.update({ ignoreFiles: normalizeIgnoreFiles(update.value) })
+    } else {
+      await settings.update({
+        workspaceIgnoreFiles: normalizeWorkspaceIgnoreFiles(update.value),
+      })
+    }
+    return settings.get()
+  }
+  const isEnabled = (): boolean => readSettings().enabled
+  new AtFileRuntime(ctx, resolved, readSettings, writeSettings)
   // Strict endpoint registration: the gateway resolves atFile/search from
   // this manifest, independent of decorator marker state.
   ctx.effect(() => {

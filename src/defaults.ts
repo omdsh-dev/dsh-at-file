@@ -71,6 +71,15 @@ export const DEFAULT_IGNORE_FILES = [
   '.DS_Store',
 ] as const
 
+/** Fresh settings defaults for Host and browser initialization. */
+export function defaultAtFileSettings(): AtFileSettings {
+  return {
+    enabled: true,
+    ignoreFiles: [...DEFAULT_IGNORE_FILES],
+    workspaceIgnoreFiles: [],
+  }
+}
+
 /** Trim file basenames and remove empty or case-insensitive duplicate entries. */
 export function normalizeIgnoreFiles(values: readonly string[]): string[] {
   const seen = new Set<string>()

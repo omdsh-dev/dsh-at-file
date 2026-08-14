@@ -11,7 +11,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { indexWorkspace } from './files.ts'
-import type { AtFileSettings, FileEntry } from './contract.ts'
+import type { AtFileSettings, AtFileSettingsUpdate, FileEntry } from './contract.ts'
 import type { ResolvedConfig } from './types.ts'
 import { effectiveIgnoreFiles } from './defaults.ts'
 
@@ -26,9 +26,22 @@ export class AtFileRuntime extends TypertRemoteService {
   constructor(
     ctx: Context,
     private readonly config: ResolvedConfig,
-    private readonly getSettings: () => AtFileSettings,
+    private readonly readSettings: () => AtFileSettings,
+    private readonly writeSettings: (update: AtFileSettingsUpdate) => Promise<AtFileSettings>,
   ) {
     super(ctx, 'atFile')
+  }
+
+  /** Read the resolved durable settings through the plugin-owned wire. */
+  @Remote
+  getSettings(): AtFileSettings {
+    return this.readSettings()
+  }
+
+  /** Persist one settings field and return the resolved section. */
+  @Remote
+  updateSettings(update: AtFileSettingsUpdate): Promise<AtFileSettings> {
+    return this.writeSettings(update)
   }
 
   /**
@@ -41,7 +54,7 @@ export class AtFileRuntime extends TypertRemoteService {
    */
   @Remote
   async search(agent: Agent, signal: AbortSignal): Promise<readonly FileEntry[]> {
-    const settings = this.getSettings()
+    const settings = this.readSettings()
     if (!settings.enabled) {
       throw new Error('at-file is disabled in Settings')
     }

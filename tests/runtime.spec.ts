@@ -32,11 +32,12 @@ function originalOf(service: object): object {
 
 /** A settings provider stub whose value is switchable per test. */
 function settingsProvider(read: () => AtFileSettings) {
+  let patch: Partial<AtFileSettings> = {}
   return {
     register: () => ({
-      get: read,
+      get: () => ({ ...read(), ...patch }),
       watch: () => () => {},
-      update: async () => {},
+      update: async (next: Partial<AtFileSettings>) => { patch = { ...patch, ...next } },
       replace: async () => {},
     }),
   }
@@ -80,20 +81,26 @@ describe('dsh-at-file host composition', () => {
     await fiber.dispose()
   })
 
-  it('registers the strict Typert manifest for the search endpoint', async () => {
+  it('registers the strict Typert manifest for search and settings', async () => {
     const ctx = new Context()
     const fiber = await mount(ctx)
     const registry = ctx.get('typert') as TypertRegistry
     expect(registry.local.get('atFile/search')).toMatchObject({ service: 'atFile', method: 'search' })
+    expect(registry.local.get('atFile/getSettings')).toMatchObject({ service: 'atFile', method: 'getSettings' })
+    expect(registry.local.get('atFile/updateSettings')).toMatchObject({ service: 'atFile', method: 'updateSettings' })
     await fiber.dispose()
     expect(registry.local.get('atFile/search')).toBeUndefined()
   })
 
-  it('exports only search as a Remote method', async () => {
+  it('exports search and settings as Remote methods', async () => {
     const ctx = new Context()
     const fiber = await mount(ctx)
     const runtime = ctx.get('atFile') as AtFileRuntime
-    expect(remoteMethods(originalOf(runtime)).map(marker => marker.method)).toEqual(['search'])
+    expect(remoteMethods(originalOf(runtime)).map(marker => marker.method)).toEqual([
+      'getSettings',
+      'updateSettings',
+      'search',
+    ])
     await fiber.dispose()
   })
 
@@ -103,6 +110,40 @@ describe('dsh-at-file host composition', () => {
     expect(ctx.get('atFile')).toBeDefined()
     await fiber.dispose()
     expect(ctx.get('atFile')).toBeUndefined()
+  })
+
+  it('reads and normalizes durable settings through the plugin Remote', async () => {
+    const ctx = new Context()
+    const fiber = await mount(ctx)
+    try {
+      const runtime = ctx.get('atFile') as AtFileRuntime
+      expect(runtime.getSettings()).toEqual({
+        enabled: true,
+        ignoreFiles: [...plugin.DEFAULT_IGNORE_FILES],
+        workspaceIgnoreFiles: [],
+      })
+      expect(await runtime.updateSettings({
+        field: 'ignoreFiles',
+        value: [' noise.log ', 'NOISE.LOG', ''],
+      })).toMatchObject({ ignoreFiles: ['noise.log'] })
+      expect(await runtime.updateSettings({
+        field: 'workspaceIgnoreFiles',
+        value: [
+          { workspace: 'C:\\Work', ignoreFiles: ['first.tmp'] },
+          { workspace: 'c:/work/', ignoreFiles: [' SECOND.tmp ', 'FIRST.TMP'] },
+          { workspace: '', ignoreFiles: ['empty.tmp'] },
+        ],
+      })).toMatchObject({
+        workspaceIgnoreFiles: [{
+          workspace: 'C:\\Work',
+          ignoreFiles: ['first.tmp', 'SECOND.tmp'],
+        }],
+      })
+      expect(await runtime.updateSettings({ field: 'enabled', value: false }))
+        .toMatchObject({ enabled: false })
+    } finally {
+      await fiber.dispose()
+    }
   })
 
   it('search indexes the addressed workspace, files and directories', async () => {

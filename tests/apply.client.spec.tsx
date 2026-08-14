@@ -14,115 +14,60 @@ import { NS, en, zh } from '../src/client/locales.ts'
 import { SOURCE_NAME } from '../src/client/source.ts'
 import { STYLE_ID } from '../src/client/styles.ts'
 import { DEFAULT_IGNORE_FILES } from '../src/defaults.ts'
-import type { AtFileSettings, WorkspaceIgnoreFiles } from '../src/contract.ts'
+import type { AtFileSettings, AtFileSettingsUpdate, WorkspaceIgnoreFiles } from '../src/contract.ts'
 
 type RemoteResult<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string; details: object } }
 
-/** A settings scope stub with switchable value + recorded writes. */
-function scopeStub(
-  initial: boolean,
-  initialIgnoreFiles: readonly string[] = DEFAULT_IGNORE_FILES,
-  initialWorkspaceIgnoreFiles: readonly WorkspaceIgnoreFiles[] = [],
-) {
-  let value: AtFileSettings | undefined = {
-    enabled: initial,
-    ignoreFiles: [...initialIgnoreFiles],
-    workspaceIgnoreFiles: initialWorkspaceIgnoreFiles.map(entry => ({
-      workspace: entry.workspace,
-      ignoreFiles: [...entry.ignoreFiles],
-    })),
-  }
-  const listeners = new Set<() => void>()
-  return {
-    scope: {
-      getSnapshot: () => ({ status: value === undefined ? 'loading' : 'ready', value, revision: 0, writable: true }),
-      subscribe: (listener: () => void) => {
-        listeners.add(listener)
-        return () => { listeners.delete(listener) }
-      },
-      set: vi.fn(async (field: string, next: unknown) => {
-        const current = value ?? {
-          enabled: true,
-          ignoreFiles: [...DEFAULT_IGNORE_FILES],
-          workspaceIgnoreFiles: [],
-        }
-        if (field === 'enabled') value = { ...current, enabled: next as boolean }
-        else if (field === 'ignoreFiles') value = { ...current, ignoreFiles: [...next as readonly string[]] }
-        else value = {
-          ...current,
-          workspaceIgnoreFiles: (next as readonly WorkspaceIgnoreFiles[]).map(entry => ({
-            workspace: entry.workspace,
-            ignoreFiles: [...entry.ignoreFiles],
-          })),
-        }
-        for (const listener of listeners) listener()
-      }),
-    },
-    setValue: (next: boolean) => {
-      value = {
-        ...(value ?? { ignoreFiles: [...DEFAULT_IGNORE_FILES], workspaceIgnoreFiles: [] }),
-        enabled: next,
-      }
-      for (const listener of listeners) listener()
-    },
-    setIgnoreFilesValue: (next: readonly string[]) => {
-      value = {
-        ...(value ?? { enabled: true, workspaceIgnoreFiles: [] }),
-        ignoreFiles: [...next],
-      }
-      for (const listener of listeners) listener()
-    },
-    setWorkspaceIgnoreFilesValue: (next: readonly WorkspaceIgnoreFiles[]) => {
-      value = {
-        ...(value ?? { enabled: true, ignoreFiles: [...DEFAULT_IGNORE_FILES] }),
-        workspaceIgnoreFiles: next.map(entry => ({ workspace: entry.workspace, ignoreFiles: [...entry.ignoreFiles] })),
-      }
-      for (const listener of listeners) listener()
-    },
-    clearValue: () => {
-      value = undefined
-      for (const listener of listeners) listener()
-    },
-  }
-}
-
 interface BootOptions {
   atFileSearch?: (sessionId: SessionId, signal: AbortSignal) => Promise<RemoteResult<readonly { path: string; relative: string; kind: 'file' | 'dir' }[]>>
+  atFileGetSettings?: () => Promise<RemoteResult<AtFileSettings>>
+  atFileUpdateSettings?: (update: AtFileSettingsUpdate) => Promise<RemoteResult<AtFileSettings>>
   openPath?: () => Promise<{ result: { ok: true } | { ok: false; error: { message: string } } }>
   enabled?: boolean
   ignoreFiles?: readonly string[]
   workspaceIgnoreFiles?: readonly WorkspaceIgnoreFiles[]
   withoutNamespace?: boolean
+  remoteMount?: () => Promise<() => void>
 }
 
 /** Boot the plugin body over a stub-service context and return the recorded surfaces. */
 async function boot(options: BootOptions = {}) {
   const ctx = new Context()
-  const registerSource = vi.fn(() => () => {})
+  const sourceDispose = vi.fn()
+  const registerSource = vi.fn(() => sourceDispose)
   const controller = { menu: { getSnapshot: vi.fn(), subscribe: vi.fn() }, track: vi.fn() }
   const sessionOf = vi.fn(() => controller)
   const sessionScope = {}
   const scopeSession = vi.fn(() => sessionScope)
-  const mount = vi.fn(async () => () => {})
+  const mount = vi.fn(options.remoteMount ?? (async () => () => {}))
   const localeRegister = vi.fn(() => () => {})
   const bind = vi.fn(() => (key: string, params?: Record<string, string>) => (params?.message ? `${key}: ${params.message}` : key))
   const slotsRegister = vi.fn()
   const slotsInject = vi.fn((_name: string, factory: () => void) => { factory() })
   const openPath = vi.fn(options.openPath ?? (async () => ({ result: { ok: true as const } })))
-  const { scope, setValue, setIgnoreFilesValue, setWorkspaceIgnoreFilesValue, clearValue } = scopeStub(
-    options.enabled ?? true,
-    options.ignoreFiles,
-    options.workspaceIgnoreFiles,
-  )
+  let settings: AtFileSettings = {
+    enabled: options.enabled ?? true,
+    ignoreFiles: [...options.ignoreFiles ?? DEFAULT_IGNORE_FILES],
+    workspaceIgnoreFiles: (options.workspaceIgnoreFiles ?? []).map(entry => ({
+      workspace: entry.workspace,
+      ignoreFiles: [...entry.ignoreFiles],
+    })),
+  }
+  const getSettings = vi.fn(options.atFileGetSettings ?? (async () => ({ ok: true as const, value: settings })))
+  const updateSettings = vi.fn(options.atFileUpdateSettings ?? (async (update: AtFileSettingsUpdate) => {
+    settings = { ...settings, [update.field]: update.value }
+    return { ok: true as const, value: settings }
+  }))
   ctx.provide('inputTriggers', { registerSource, sessionOf })
   ctx.provide('connection', { api: { host: { openPath } } })
   ctx.provide('remote', { $mount: mount })
   if (options.withoutNamespace !== true) {
     ctx.provide('remote.atFile', {
       search: options.atFileSearch ?? (async () => ({ ok: true as const, value: [] })),
+      getSettings,
+      updateSettings,
     })
   }
-  ctx.provide('settingsScope', { bind: () => scope })
   ctx.provide('slots', { inject: slotsInject, register: slotsRegister })
   ctx.provide('locale', { register: localeRegister, bind })
   ctx.provide('sessions', { scope: scopeSession })
@@ -132,7 +77,8 @@ async function boot(options: BootOptions = {}) {
   await Promise.resolve()
   return {
     ctx, registerSource, sessionOf, sessionScope, scopeSession, mount, localeRegister, bind,
-    slotsRegister, slotsInject, openPath, setValue, setIgnoreFilesValue, setWorkspaceIgnoreFilesValue, clearValue, scope,
+    slotsRegister, slotsInject, openPath, getSettings, updateSettings, sourceDispose,
+    setRemoteSettings: (next: AtFileSettings) => { settings = next },
   }
 }
 
@@ -149,12 +95,32 @@ function registered(booted: Awaited<ReturnType<typeof boot>>): RegisteredSource 
   return booted.registerSource.mock.calls[0]![0] as RegisteredSource
 }
 
+interface RegisteredSettingsSection {
+  id: string
+  order: number
+  label: () => string
+  locale: string
+  inject: () => {
+    hooks: { scope: { getSnapshot: () => { value: AtFileSettings } } }
+    setEnabled: (enabled: boolean) => Promise<void>
+    setIgnoreFiles: (ignoreFiles: readonly string[]) => Promise<void>
+    setWorkspaceIgnoreFiles: (workspace: string, ignoreFiles: readonly string[]) => Promise<void>
+  }
+}
+
+function settingsSection(booted: Awaited<ReturnType<typeof boot>>): RegisteredSettingsSection {
+  const section = booted.slotsRegister.mock.calls
+    .find(call => call[0]?.name === 'settings.section')?.[0] as RegisteredSettingsSection | undefined
+  expect(section).toBeDefined()
+  return section as RegisteredSettingsSection
+}
+
 const s1 = { sessionId: 's1' as SessionId }
 const signal = () => new AbortController().signal
 
 describe('dsh-at-file client apply', () => {
   it('declares the picker and carrier services', () => {
-    expect(inject).toEqual(['inputTriggers', 'sessions', 'connection', 'remote', 'slots', 'locale', 'settingsScope'])
+    expect(inject).toEqual(['inputTriggers', 'sessions', 'connection', 'remote', 'slots', 'locale'])
   })
 
   it('mounts the atFile Remote contribution and registers the @ source', async () => {
@@ -189,31 +155,124 @@ describe('dsh-at-file client apply', () => {
 
   it('does not register the source while the settings switch is off, then registers on flip', async () => {
     const booted = await boot({ enabled: false })
-    expect(booted.registerSource).not.toHaveBeenCalled()
-    booted.setValue(true)
-    await Promise.resolve()
     expect(booted.registerSource).toHaveBeenCalledTimes(1)
+    expect(booted.sourceDispose).toHaveBeenCalledTimes(1)
+    await settingsSection(booted).inject().setEnabled(true)
+    expect(booted.registerSource).toHaveBeenCalledTimes(2)
   })
 
   it('unregisters the source when the switch flips off after boot', async () => {
     const booted = await boot({ enabled: true })
     expect(booted.registerSource).toHaveBeenCalledTimes(1)
-    booted.setValue(false)
-    await Promise.resolve()
+    await settingsSection(booted).inject().setEnabled(false)
+    expect(booted.sourceDispose).toHaveBeenCalledTimes(1)
     // A flip-off disposes the source; a flip-on re-registers (new call).
-    booted.setValue(true)
-    await Promise.resolve()
+    await settingsSection(booted).inject().setEnabled(true)
     expect(booted.registerSource).toHaveBeenCalledTimes(2)
   })
 
   it('defaults to enabled before the first settings read, then follows the value', async () => {
-    const booted = await boot({ enabled: true })
+    let resolve: ((result: RemoteResult<AtFileSettings>) => void) | undefined
+    const pending = new Promise<RemoteResult<AtFileSettings>>(done => { resolve = done })
+    const booted = await boot({ atFileGetSettings: async () => pending })
     expect(booted.registerSource).toHaveBeenCalledTimes(1)
-    // The scope clears to an unloaded state: the source stays registered
-    // (undefined value falls back to the schema default, enabled).
-    booted.clearValue()
+    resolve?.({
+      ok: true,
+      value: { enabled: false, ignoreFiles: [...DEFAULT_IGNORE_FILES], workspaceIgnoreFiles: [] },
+    })
     await Promise.resolve()
-    expect(booted.registerSource).toHaveBeenCalledTimes(1)
+    await Promise.resolve()
+    expect(booted.sourceDispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloads settings after a connection reset', async () => {
+    const booted = await boot()
+    booted.setRemoteSettings({ enabled: false, ignoreFiles: ['reset.tmp'], workspaceIgnoreFiles: [] })
+    booted.ctx.emit('connection/reset')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(booted.getSettings).toHaveBeenCalledTimes(2)
+    expect(settingsSection(booted).inject().hooks.scope.getSnapshot().value)
+      .toMatchObject({ enabled: false, ignoreFiles: ['reset.tmp'] })
+  })
+
+  it('logs a structured settings read failure and keeps the last snapshot', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const booted = await boot({
+        atFileGetSettings: async () => ({
+          ok: false,
+          error: { code: 'SETTINGS_DOWN', message: 'unavailable', details: {} },
+        }),
+      })
+      expect(errorSpy).toHaveBeenCalledWith('[dsh-at-file] settings read failed: SETTINGS_DOWN: unavailable')
+      expect(settingsSection(booted).inject().hooks.scope.getSnapshot().value.enabled).toBe(true)
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('logs a rejecting settings read', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await boot({ atFileGetSettings: async () => { throw new Error('read transport down') } })
+      expect(errorSpy).toHaveBeenCalledWith('[dsh-at-file] settings read failed:', expect.any(Error))
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('logs settings updates rejected by the Remote', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const booted = await boot({
+        atFileUpdateSettings: async () => ({
+          ok: false,
+          error: { code: 'WRITE_REFUSED', message: 'read only', details: {} },
+        }),
+      })
+      await settingsSection(booted).inject().setEnabled(false)
+      expect(errorSpy).toHaveBeenCalledWith('[dsh-at-file] settings update failed: WRITE_REFUSED: read only')
+      expect(settingsSection(booted).inject().hooks.scope.getSnapshot().value.enabled).toBe(true)
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('logs a rejecting settings update', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const booted = await boot({
+        atFileUpdateSettings: async () => { throw new Error('write transport down') },
+      })
+      await settingsSection(booted).inject().setEnabled(false)
+      expect(errorSpy).toHaveBeenCalledWith('[dsh-at-file] settings update failed:', expect.any(Error))
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('handles settings actions before the Remote mount settles', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    let finishMount: (() => void) | undefined
+    const waitForMount = new Promise<void>(resolve => { finishMount = resolve })
+    try {
+      const booted = await boot({
+        remoteMount: async () => {
+          await waitForMount
+          return () => {}
+        },
+      })
+      booted.ctx.emit('connection/reset')
+      await settingsSection(booted).inject().setEnabled(false)
+      expect(errorSpy).toHaveBeenCalledWith(
+        '[dsh-at-file] settings update failed:',
+        expect.objectContaining({ message: 'the atFile Remote is not mounted' }),
+      )
+    } finally {
+      finishMount?.()
+      errorSpy.mockRestore()
+    }
   })
 
   it('registers the dock with its inject face routed to the host opener', async () => {
@@ -255,33 +314,24 @@ describe('dsh-at-file client apply', () => {
     expect(() => navigator.inject('missing')).toThrow(/session "missing" has no client scope/)
   })
 
-  it('registers the settings section whose toggle writes the scope', async () => {
-    const { slotsRegister, scope } = await boot({
+  it('registers the settings section whose controls write through the plugin Remote', async () => {
+    const booted = await boot({
       workspaceIgnoreFiles: [{ workspace: '/work/a', ignoreFiles: ['old.tmp'] }],
     })
-    const section = slotsRegister.mock.calls.find(call => call[0]?.name === 'settings.section')?.[0] as {
-      id: string
-      order: number
-      label: () => string
-      locale: string
-      inject: () => {
-        setEnabled: (enabled: boolean) => Promise<void>
-        setIgnoreFiles: (ignoreFiles: readonly string[]) => Promise<void>
-        setWorkspaceIgnoreFiles: (workspace: string, ignoreFiles: readonly string[]) => Promise<void>
-      }
-    }
+    const section = settingsSection(booted)
     expect(section).toMatchObject({ id: 'at-file', order: 55, locale: NS })
     expect(section.label()).toBe('nav')
     await section.inject().setEnabled(false)
-    expect(scope.set).toHaveBeenCalledWith('enabled', false)
+    expect(booted.updateSettings).toHaveBeenCalledWith({ field: 'enabled', value: false })
     await section.inject().setIgnoreFiles(['desktop.ini'])
-    expect(scope.set).toHaveBeenCalledWith('ignoreFiles', ['desktop.ini'])
+    expect(booted.updateSettings).toHaveBeenCalledWith({ field: 'ignoreFiles', value: ['desktop.ini'] })
     await section.inject().setWorkspaceIgnoreFiles('/work/a', ['local.tmp'])
-    expect(scope.set).toHaveBeenCalledWith('workspaceIgnoreFiles', [
-      { workspace: '/work/a', ignoreFiles: ['local.tmp'] },
-    ])
+    expect(booted.updateSettings).toHaveBeenCalledWith({
+      field: 'workspaceIgnoreFiles',
+      value: [{ workspace: '/work/a', ignoreFiles: ['local.tmp'] }],
+    })
     await section.inject().setWorkspaceIgnoreFiles('/work/a', [])
-    expect(scope.set).toHaveBeenLastCalledWith('workspaceIgnoreFiles', [])
+    expect(booted.updateSettings).toHaveBeenLastCalledWith({ field: 'workspaceIgnoreFiles', value: [] })
   })
 
   it('logs failed host opens', async () => {
@@ -341,7 +391,7 @@ describe('dsh-at-file client apply', () => {
     const booted = await boot({ atFileSearch })
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     expect(atFileSearch).toHaveBeenCalledTimes(1)
-    booted.setIgnoreFilesValue(['desktop.ini'])
+    await settingsSection(booted).inject().setIgnoreFiles(['desktop.ini'])
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     expect(atFileSearch).toHaveBeenCalledTimes(2)
   })
@@ -351,7 +401,7 @@ describe('dsh-at-file client apply', () => {
     const booted = await boot({ atFileSearch })
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     expect(atFileSearch).toHaveBeenCalledTimes(1)
-    booted.setWorkspaceIgnoreFilesValue([{ workspace: '/ws', ignoreFiles: ['local.tmp'] }])
+    await settingsSection(booted).inject().setWorkspaceIgnoreFiles('/ws', ['local.tmp'])
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     expect(atFileSearch).toHaveBeenCalledTimes(2)
   })
@@ -360,12 +410,20 @@ describe('dsh-at-file client apply', () => {
     const ctx = new Context()
     const unmount = vi.fn(async () => {})
     const registerDispose = vi.fn()
-    const { scope } = scopeStub(true)
     ctx.provide('inputTriggers', { registerSource: vi.fn(() => registerDispose) })
     ctx.provide('connection', { api: { host: { openPath: async () => ({ result: { ok: true as const } }) } } })
     ctx.provide('remote', { $mount: vi.fn(async () => unmount) })
-    ctx.provide('remote.atFile', { search: async () => ({ ok: true as const, value: [] }) })
-    ctx.provide('settingsScope', { bind: () => scope })
+    ctx.provide('remote.atFile', {
+      search: async () => ({ ok: true as const, value: [] }),
+      getSettings: async () => ({
+        ok: true as const,
+        value: { enabled: true, ignoreFiles: [...DEFAULT_IGNORE_FILES], workspaceIgnoreFiles: [] },
+      }),
+      updateSettings: async () => ({
+        ok: true as const,
+        value: { enabled: true, ignoreFiles: [...DEFAULT_IGNORE_FILES], workspaceIgnoreFiles: [] },
+      }),
+    })
     ctx.provide('slots', { inject: vi.fn(), register: vi.fn() })
     ctx.provide('locale', { register: vi.fn(() => () => {}), bind: vi.fn(() => (key: string) => key) })
     ctx.provide('sessions', {})

@@ -39,14 +39,21 @@ The default index skips common version-control directories, IDE metadata, depend
 ## Install or Update
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.5.0.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.5.1.tar.gz
 ```
 
-Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.5.0`.
+Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.5.1`.
 
-File filters are managed under **Settings -> File mentions**. The **Global** tab applies its rules to every workspace. The **Workspace** tab adds rules for one selected workspace while retaining the global rules. Each rule is a complete basename and matching is case-insensitive.
+## File Filters
 
-Rules are added and removed individually. The global list can be restored to the built-in defaults, and a workspace list can be cleared without changing other workspaces. Every change invalidates cached indexes, so the next `@` search uses the updated filters immediately.
+Open **Settings -> File mentions** to manage file-name filters.
+
+- **Global** contains rules shared by every workspace.
+- **Workspace** contains additional rules for the selected workspace path. Each workspace keeps its own list, and the panel shows the global rules it inherits.
+
+Each rule matches one complete basename, without case sensitivity. Add and remove rules individually. **Restore defaults** resets the global list to the built-in file names. **Clear workspace rules** removes only the selected workspace's additions.
+
+Settings are saved in the DSH web profile through the plugin's own Host connection. Existing `ignoreFiles` values from `0.4.1` remain in the global list after updating. A change clears the affected index cache, so the next `@` search uses the saved rules.
 
 ## Configuration
 

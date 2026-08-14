@@ -9,16 +9,19 @@
 // Type-only: the ctx.remote merge and the forwarded Host-event face.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionHandle, SessionId } from '@deepseek-ai/dsh-api-remotes/client'
-import type { ClientContext, ISessions } from '@deepseek-ai/dsh-client-runtime/client'
+import {
+  createSnapshotStore,
+  type ClientContext,
+  type ISessions,
+} from '@deepseek-ai/dsh-client-runtime/client'
 import type { InputTriggerServiceContract } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 // Type-only: the conversation SlotMap / standard-kit merges for the dock seat.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: the ctx.locale Context merge.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Type-only: the ctx.settingsScope Context merge and the scope contract.
+// Type-only: brings the settings.section SlotMap declaration into this program.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
-import type { AtFileSettings, FileEntry } from '../contract.ts'
+import type { AtFileSettings, AtFileSettingsUpdate, FileEntry } from '../contract.ts'
 import { AT_FILE_REMOTE } from './remote.ts'
 import { createAtFileSource } from './source.ts'
 import { FilesDock, type AtFileDockInjected } from './FilesDock.tsx'
@@ -28,18 +31,21 @@ import { adoptStyles } from './styles.ts'
 import { FolderNavigator, type FolderNavigatorInjected } from './FolderNavigator.tsx'
 import {
   DEFAULT_IGNORE_FILES,
+  defaultAtFileSettings,
   ignoreFilesSettingsKey,
   normalizeIgnoreFiles,
   normalizeWorkspaceIgnoreFiles,
   workspacePathKey,
 } from '../defaults.ts'
 
-/** Required services: picker pipeline, session projection, carrier, Remote face, slots, locale, settings scope. */
-export const inject = ['inputTriggers', 'sessions', 'connection', 'remote', 'slots', 'locale', 'settingsScope']
+/** Required services: picker pipeline, session projection, carrier, Remote face, slots, and locale. */
+export const inject = ['inputTriggers', 'sessions', 'connection', 'remote', 'slots', 'locale']
 
 /** The mounted atFile namespace service's callable face. */
 interface AtFileNamespaceFace {
   search(sessionId: SessionId, signal?: AbortSignal): Promise<{ ok: true; value: readonly FileEntry[] } | { ok: false; error: { code: string; message: string; details: object } }>
+  getSettings(): Promise<{ ok: true; value: AtFileSettings } | { ok: false; error: { code: string; message: string; details: object } }>
+  updateSettings(update: AtFileSettingsUpdate): Promise<{ ok: true; value: AtFileSettings } | { ok: false; error: { code: string; message: string; details: object } }>
 }
 
 /**
@@ -50,6 +56,22 @@ export function apply(ctx: ClientContext): void {
   adoptStyles()
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-at-file: dictionaries')
 
+  const scope = createSnapshotStore({ value: defaultAtFileSettings() })
+  let settingsGeneration = 0
+  let settingsTail: Promise<void> = Promise.resolve()
+
+  const reportSettingsError = (
+    operation: 'read' | 'update',
+    error: { code: string; message: string } | unknown,
+  ): void => {
+    if (typeof error === 'object' && error !== null && 'code' in error && 'message' in error) {
+      const remoteError = error as { code: string; message: string }
+      console.error(`[dsh-at-file] settings ${operation} failed: ${remoteError.code}: ${remoteError.message}`)
+      return
+    }
+    console.error(`[dsh-at-file] settings ${operation} failed:`, error)
+  }
+
   // The mounted namespace handle resolves through the service store
   // (`ctx.reflect.get`), not through `ctx.remote.atFile`: the generated-style
   // dotted read walks the cordis fiber chain, which stops at the Loader's
@@ -57,13 +79,56 @@ export function apply(ctx: ClientContext): void {
   // the namespace service mounted under the gateway entry is unreachable
   // that way (the store path resolves it by isolation label instead).
   let atFile: AtFileNamespaceFace | undefined
+  const loadSettings = async (): Promise<void> => {
+    const remote = atFile
+    if (remote === undefined) return
+    const generation = ++settingsGeneration
+    try {
+      const result = await remote.getSettings()
+      if (atFile !== remote || generation !== settingsGeneration) return
+      if (!result.ok) {
+        reportSettingsError('read', result.error)
+        return
+      }
+      scope.set({ value: result.value })
+    } catch (error) {
+      if (atFile === remote && generation === settingsGeneration) reportSettingsError('read', error)
+    }
+  }
+
+  const updateSettings = (update: AtFileSettingsUpdate): Promise<void> => {
+    const operation = settingsTail.then(async () => {
+      const remote = atFile
+      if (remote === undefined) {
+        reportSettingsError('update', new Error('the atFile Remote is not mounted'))
+        return
+      }
+      const generation = ++settingsGeneration
+      try {
+        const result = await remote.updateSettings(update)
+        if (atFile !== remote || generation !== settingsGeneration) return
+        if (!result.ok) {
+          reportSettingsError('update', result.error)
+          return
+        }
+        scope.set({ value: result.value })
+      } catch (error) {
+        if (atFile === remote && generation === settingsGeneration) reportSettingsError('update', error)
+      }
+    })
+    settingsTail = operation.catch(() => {})
+    return operation
+  }
+
   ctx.effect(async () => {
     const dispose = await ctx.remote.$mount(AT_FILE_REMOTE)
     atFile = (ctx.reflect as unknown as { get(name: string): unknown }).get('remote.atFile') as AtFileNamespaceFace | undefined
     if (atFile === undefined) {
       throw new Error('dsh-at-file: the atFile Remote namespace did not mount')
     }
+    await loadSettings()
     return () => {
+      settingsGeneration += 1
       atFile = undefined
       void dispose()
     }
@@ -73,7 +138,6 @@ export function apply(ctx: ClientContext): void {
   const inputTriggers = ctx.get('inputTriggers') as InputTriggerServiceContract
   const sessions = ctx.get('sessions') as unknown as ISessions
   const t = ctx.locale.bind(NS)
-  const scope = ctx.settingsScope.bind<AtFileSettings>({ namespace: 'at-file' })
 
   // Relative → entry map backing the dock's open action (resolves a draft
   // token to its absolute path from the last settled index).
@@ -91,10 +155,10 @@ export function apply(ctx: ClientContext): void {
   ctx.on('connection/reset', () => {
     invalidateAll()
     entryByRel.clear()
+    void loadSettings()
   })
-  // The settings switch gates the picker live: the source registers while the
-  // namespace value is enabled (undefined before the first settings read —
-  // the schema default is enabled) and unregisters the moment it flips off.
+  // The settings switch gates the picker live. The schema default applies
+  // until the first Host read, then every returned update replaces the snapshot.
   let sourceRegistered = false
   let sourceDispose = (): void => {}
   let ignoreFilesKey: string | undefined
@@ -183,15 +247,17 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: (): AtFileSectionInjected => ({
       hooks: { scope },
-      setEnabled: async (enabled: boolean) => { await scope.set('enabled', enabled) },
-      setIgnoreFiles: async (ignoreFiles: readonly string[]) => { await scope.set('ignoreFiles', [...ignoreFiles]) },
+      setEnabled: async (enabled: boolean) => { await updateSettings({ field: 'enabled', value: enabled }) },
+      setIgnoreFiles: async (ignoreFiles: readonly string[]) => {
+        await updateSettings({ field: 'ignoreFiles', value: [...ignoreFiles] })
+      },
       setWorkspaceIgnoreFiles: async (workspace: string, ignoreFiles: readonly string[]) => {
         const current = normalizeWorkspaceIgnoreFiles(scope.getSnapshot().value?.workspaceIgnoreFiles ?? [])
         const target = workspacePathKey(workspace)
         const next = current.filter(entry => workspacePathKey(entry.workspace) !== target)
         const normalized = normalizeIgnoreFiles(ignoreFiles)
         if (normalized.length > 0) next.push({ workspace, ignoreFiles: normalized })
-        await scope.set('workspaceIgnoreFiles', next)
+        await updateSettings({ field: 'workspaceIgnoreFiles', value: next })
       },
     }),
   }, AtFileSection))
