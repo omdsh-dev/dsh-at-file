@@ -14,13 +14,24 @@ import { NS, en, zh } from '../src/client/locales.ts'
 import { SOURCE_NAME } from '../src/client/source.ts'
 import { STYLE_ID } from '../src/client/styles.ts'
 import { DEFAULT_IGNORE_FILES } from '../src/defaults.ts'
-import type { AtFileSettings } from '../src/contract.ts'
+import type { AtFileSettings, WorkspaceIgnoreFiles } from '../src/contract.ts'
 
 type RemoteResult<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string; details: object } }
 
 /** A settings scope stub with switchable value + recorded writes. */
-function scopeStub(initial: boolean, initialIgnoreFiles: readonly string[] = DEFAULT_IGNORE_FILES) {
-  let value: AtFileSettings | undefined = { enabled: initial, ignoreFiles: [...initialIgnoreFiles] }
+function scopeStub(
+  initial: boolean,
+  initialIgnoreFiles: readonly string[] = DEFAULT_IGNORE_FILES,
+  initialWorkspaceIgnoreFiles: readonly WorkspaceIgnoreFiles[] = [],
+) {
+  let value: AtFileSettings | undefined = {
+    enabled: initial,
+    ignoreFiles: [...initialIgnoreFiles],
+    workspaceIgnoreFiles: initialWorkspaceIgnoreFiles.map(entry => ({
+      workspace: entry.workspace,
+      ignoreFiles: [...entry.ignoreFiles],
+    })),
+  }
   const listeners = new Set<() => void>()
   return {
     scope: {
@@ -29,20 +40,43 @@ function scopeStub(initial: boolean, initialIgnoreFiles: readonly string[] = DEF
         listeners.add(listener)
         return () => { listeners.delete(listener) }
       },
-      set: vi.fn(async (field: string, next: boolean | readonly string[]) => {
-        const current = value ?? { enabled: true, ignoreFiles: [...DEFAULT_IGNORE_FILES] }
-        value = field === 'enabled'
-          ? { ...current, enabled: next as boolean }
-          : { ...current, ignoreFiles: [...next as readonly string[]] }
+      set: vi.fn(async (field: string, next: unknown) => {
+        const current = value ?? {
+          enabled: true,
+          ignoreFiles: [...DEFAULT_IGNORE_FILES],
+          workspaceIgnoreFiles: [],
+        }
+        if (field === 'enabled') value = { ...current, enabled: next as boolean }
+        else if (field === 'ignoreFiles') value = { ...current, ignoreFiles: [...next as readonly string[]] }
+        else value = {
+          ...current,
+          workspaceIgnoreFiles: (next as readonly WorkspaceIgnoreFiles[]).map(entry => ({
+            workspace: entry.workspace,
+            ignoreFiles: [...entry.ignoreFiles],
+          })),
+        }
         for (const listener of listeners) listener()
       }),
     },
     setValue: (next: boolean) => {
-      value = { ...(value ?? { ignoreFiles: [...DEFAULT_IGNORE_FILES] }), enabled: next }
+      value = {
+        ...(value ?? { ignoreFiles: [...DEFAULT_IGNORE_FILES], workspaceIgnoreFiles: [] }),
+        enabled: next,
+      }
       for (const listener of listeners) listener()
     },
     setIgnoreFilesValue: (next: readonly string[]) => {
-      value = { ...(value ?? { enabled: true }), ignoreFiles: [...next] }
+      value = {
+        ...(value ?? { enabled: true, workspaceIgnoreFiles: [] }),
+        ignoreFiles: [...next],
+      }
+      for (const listener of listeners) listener()
+    },
+    setWorkspaceIgnoreFilesValue: (next: readonly WorkspaceIgnoreFiles[]) => {
+      value = {
+        ...(value ?? { enabled: true, ignoreFiles: [...DEFAULT_IGNORE_FILES] }),
+        workspaceIgnoreFiles: next.map(entry => ({ workspace: entry.workspace, ignoreFiles: [...entry.ignoreFiles] })),
+      }
       for (const listener of listeners) listener()
     },
     clearValue: () => {
@@ -57,6 +91,7 @@ interface BootOptions {
   openPath?: () => Promise<{ result: { ok: true } | { ok: false; error: { message: string } } }>
   enabled?: boolean
   ignoreFiles?: readonly string[]
+  workspaceIgnoreFiles?: readonly WorkspaceIgnoreFiles[]
   withoutNamespace?: boolean
 }
 
@@ -74,7 +109,11 @@ async function boot(options: BootOptions = {}) {
   const slotsRegister = vi.fn()
   const slotsInject = vi.fn((_name: string, factory: () => void) => { factory() })
   const openPath = vi.fn(options.openPath ?? (async () => ({ result: { ok: true as const } })))
-  const { scope, setValue, setIgnoreFilesValue, clearValue } = scopeStub(options.enabled ?? true, options.ignoreFiles)
+  const { scope, setValue, setIgnoreFilesValue, setWorkspaceIgnoreFilesValue, clearValue } = scopeStub(
+    options.enabled ?? true,
+    options.ignoreFiles,
+    options.workspaceIgnoreFiles,
+  )
   ctx.provide('inputTriggers', { registerSource, sessionOf })
   ctx.provide('connection', { api: { host: { openPath } } })
   ctx.provide('remote', { $mount: mount })
@@ -93,7 +132,7 @@ async function boot(options: BootOptions = {}) {
   await Promise.resolve()
   return {
     ctx, registerSource, sessionOf, sessionScope, scopeSession, mount, localeRegister, bind,
-    slotsRegister, slotsInject, openPath, setValue, setIgnoreFilesValue, clearValue, scope,
+    slotsRegister, slotsInject, openPath, setValue, setIgnoreFilesValue, setWorkspaceIgnoreFilesValue, clearValue, scope,
   }
 }
 
@@ -217,7 +256,9 @@ describe('dsh-at-file client apply', () => {
   })
 
   it('registers the settings section whose toggle writes the scope', async () => {
-    const { slotsRegister, scope } = await boot()
+    const { slotsRegister, scope } = await boot({
+      workspaceIgnoreFiles: [{ workspace: '/work/a', ignoreFiles: ['old.tmp'] }],
+    })
     const section = slotsRegister.mock.calls.find(call => call[0]?.name === 'settings.section')?.[0] as {
       id: string
       order: number
@@ -226,6 +267,7 @@ describe('dsh-at-file client apply', () => {
       inject: () => {
         setEnabled: (enabled: boolean) => Promise<void>
         setIgnoreFiles: (ignoreFiles: readonly string[]) => Promise<void>
+        setWorkspaceIgnoreFiles: (workspace: string, ignoreFiles: readonly string[]) => Promise<void>
       }
     }
     expect(section).toMatchObject({ id: 'at-file', order: 55, locale: NS })
@@ -234,6 +276,12 @@ describe('dsh-at-file client apply', () => {
     expect(scope.set).toHaveBeenCalledWith('enabled', false)
     await section.inject().setIgnoreFiles(['desktop.ini'])
     expect(scope.set).toHaveBeenCalledWith('ignoreFiles', ['desktop.ini'])
+    await section.inject().setWorkspaceIgnoreFiles('/work/a', ['local.tmp'])
+    expect(scope.set).toHaveBeenCalledWith('workspaceIgnoreFiles', [
+      { workspace: '/work/a', ignoreFiles: ['local.tmp'] },
+    ])
+    await section.inject().setWorkspaceIgnoreFiles('/work/a', [])
+    expect(scope.set).toHaveBeenLastCalledWith('workspaceIgnoreFiles', [])
   })
 
   it('logs failed host opens', async () => {
@@ -294,6 +342,16 @@ describe('dsh-at-file client apply', () => {
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     expect(atFileSearch).toHaveBeenCalledTimes(1)
     booted.setIgnoreFilesValue(['desktop.ini'])
+    await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
+    expect(atFileSearch).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears cached indexes when a workspace file filter changes', async () => {
+    const atFileSearch = vi.fn(async () => ({ ok: true as const, value: [{ path: '/ws/a.ts', relative: 'a.ts', kind: 'file' as const }] }))
+    const booted = await boot({ atFileSearch })
+    await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
+    expect(atFileSearch).toHaveBeenCalledTimes(1)
+    booted.setWorkspaceIgnoreFilesValue([{ workspace: '/ws', ignoreFiles: ['local.tmp'] }])
     await registered(booted).candidates(s1, { query: 'a', position: 'inline', signal: signal() })
     expect(atFileSearch).toHaveBeenCalledTimes(2)
   })

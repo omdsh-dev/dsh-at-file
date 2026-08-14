@@ -13,6 +13,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { indexWorkspace } from './files.ts'
 import type { AtFileSettings, FileEntry } from './contract.ts'
 import type { ResolvedConfig } from './types.ts'
+import { effectiveIgnoreFiles } from './defaults.ts'
 
 /** At-file workspace service: search the cwd index for the browser picker. */
 export class AtFileRuntime extends TypertRemoteService {
@@ -51,7 +52,7 @@ export class AtFileRuntime extends TypertRemoteService {
     const index = await indexWorkspace(cwd, {
       maxFiles: this.config.maxIndexedFiles,
       ignoreDirs: this.config.ignoreDirs,
-      ignoreFiles: settings.ignoreFiles,
+      ignoreFiles: effectiveIgnoreFiles(settings, cwd),
     }, signal)
     return index.files
   }

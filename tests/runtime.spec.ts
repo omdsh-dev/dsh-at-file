@@ -17,6 +17,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as plugin from '../src/index.ts'
 import type { AtFileRuntime } from '../src/runtime.ts'
 import type { AtFileSettings } from '../src/contract.ts'
+import { AtFileSettingsSchema } from '../src/settings.ts'
 
 /** One structural Agent stub: only the session header the service reads. */
 function agentWith(cwd: string | undefined): Agent {
@@ -45,7 +46,11 @@ function settingsProvider(read: () => AtFileSettings) {
 async function mount(
   ctx: Context,
   config?: plugin.Config,
-  readSettings: () => AtFileSettings = () => ({ enabled: true, ignoreFiles: [...plugin.DEFAULT_IGNORE_FILES] }),
+  readSettings: () => AtFileSettings = () => ({
+    enabled: true,
+    ignoreFiles: [...plugin.DEFAULT_IGNORE_FILES],
+    workspaceIgnoreFiles: [],
+  }),
 ) {
   const registryFiber = ctx.plugin(TypertRegistry)
   await registryFiber
@@ -57,6 +62,14 @@ async function mount(
 }
 
 describe('dsh-at-file host composition', () => {
+  it('upgrades the previous settings shape with an empty workspace rule list', () => {
+    expect(AtFileSettingsSchema({ enabled: true, ignoreFiles: ['desktop.ini'] })).toEqual({
+      enabled: true,
+      ignoreFiles: ['desktop.ini'],
+      workspaceIgnoreFiles: [],
+    })
+  })
+
   it('boots the plugin and registers the atFile service under its own key', async () => {
     const ctx = new Context()
     const fiber = await mount(ctx)
@@ -128,7 +141,11 @@ describe('dsh-at-file host composition', () => {
   it('search refuses while the settings switch is off', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-runtime-'))
     const ctx = new Context()
-    const fiber = await mount(ctx, undefined, () => ({ enabled: false, ignoreFiles: [...plugin.DEFAULT_IGNORE_FILES] }))
+    const fiber = await mount(ctx, undefined, () => ({
+      enabled: false,
+      ignoreFiles: [...plugin.DEFAULT_IGNORE_FILES],
+      workspaceIgnoreFiles: [],
+    }))
     try {
       const runtime = ctx.get('atFile') as AtFileRuntime
       await expect(runtime.search(agentWith(root), new AbortController().signal))
@@ -145,7 +162,7 @@ describe('dsh-at-file host composition', () => {
     await writeFile(join(root, 'keep.txt'), 'keep\n')
     let ignoreFiles: string[] = ['DESKTOP.INI']
     const ctx = new Context()
-    const fiber = await mount(ctx, undefined, () => ({ enabled: true, ignoreFiles }))
+    const fiber = await mount(ctx, undefined, () => ({ enabled: true, ignoreFiles, workspaceIgnoreFiles: [] }))
     try {
       const runtime = ctx.get('atFile') as AtFileRuntime
       expect((await runtime.search(agentWith(root), new AbortController().signal)).map(file => file.relative)).toEqual(['keep.txt'])
@@ -154,6 +171,33 @@ describe('dsh-at-file host composition', () => {
     } finally {
       await fiber.dispose()
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('adds only the addressed workspace filters to the global list', async () => {
+    const first = await mkdtemp(join(tmpdir(), 'dsh-at-file-runtime-first-'))
+    const second = await mkdtemp(join(tmpdir(), 'dsh-at-file-runtime-second-'))
+    for (const root of [first, second]) {
+      await writeFile(join(root, 'global.tmp'), 'global\n')
+      await writeFile(join(root, 'local.tmp'), 'local\n')
+      await writeFile(join(root, 'keep.txt'), 'keep\n')
+    }
+    const ctx = new Context()
+    const fiber = await mount(ctx, undefined, () => ({
+      enabled: true,
+      ignoreFiles: ['global.tmp'],
+      workspaceIgnoreFiles: [{ workspace: first, ignoreFiles: ['LOCAL.TMP'] }],
+    }))
+    try {
+      const runtime = ctx.get('atFile') as AtFileRuntime
+      expect((await runtime.search(agentWith(first), new AbortController().signal)).map(file => file.relative))
+        .toEqual(['keep.txt'])
+      expect((await runtime.search(agentWith(second), new AbortController().signal)).map(file => file.relative))
+        .toEqual(['keep.txt', 'local.tmp'])
+    } finally {
+      await fiber.dispose()
+      await rm(first, { recursive: true, force: true })
+      await rm(second, { recursive: true, force: true })
     }
   })
 

@@ -13,12 +13,21 @@ export interface FileEntry {
     readonly relative: string;
     readonly kind: 'file' | 'dir';
 }
+/** File-name filters attached to one canonical workspace path. */
+export interface WorkspaceIgnoreFiles {
+    /** Canonical workspace directory path supplied by the Harness. */
+    readonly workspace: string;
+    /** Additional basenames ignored only inside this workspace. */
+    readonly ignoreFiles: string[];
+}
 /** The `at-file` settings namespace's durable shape (host and client share it). */
 export interface AtFileSettings {
     /** Whether the @file surface is enabled; false hides picker, dock, and reference injection. */
     readonly enabled: boolean;
-    /** File basenames excluded from workspace indexes, matched case-insensitively. */
+    /** File basenames excluded from every workspace index, matched case-insensitively. */
     readonly ignoreFiles: string[];
+    /** Workspace-specific basenames added to the global filters. */
+    readonly workspaceIgnoreFiles: WorkspaceIgnoreFiles[];
 }
 /** Wire codec: one session identity (branded string on the wire). */
 export declare const sessionIdSchema: z.ZodString;

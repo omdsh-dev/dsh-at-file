@@ -17,6 +17,10 @@ export const AT_FILE_NAMESPACE = settingsNamespace('at-file')
 export const AtFileSettingsSchema: z<AtFileSettings> = z.object({
   enabled: z.boolean().default(true),
   ignoreFiles: z.array(z.string()).default([...DEFAULT_IGNORE_FILES]),
+  workspaceIgnoreFiles: z.array(z.object({
+    workspace: z.string(),
+    ignoreFiles: z.array(z.string()),
+  })).default([]),
 })
 
 /**

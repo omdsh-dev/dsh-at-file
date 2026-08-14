@@ -39,12 +39,14 @@ The default index skips common version-control directories, IDE metadata, depend
 ## Install or Update
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.4.1.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.5.0.tar.gz
 ```
 
-Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.4.1`.
+Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.5.0`.
 
-The plugin can be enabled or disabled under **Settings -> File mentions**. The same section contains the ignored file-name list. Enter one complete basename per line; matching is case-insensitive. Saving the list invalidates cached indexes, so the next `@` search uses the new filters without restarting DSH. An empty list disables file-name filtering.
+File filters are managed under **Settings -> File mentions**. The **Global** tab applies its rules to every workspace. The **Workspace** tab adds rules for one selected workspace while retaining the global rules. Each rule is a complete basename and matching is case-insensitive.
+
+Rules are added and removed individually. The global list can be restored to the built-in defaults, and a workspace list can be cleared without changing other workspaces. Every change invalidates cached indexes, so the next `@` search uses the updated filters immediately.
 
 ## Configuration
 
@@ -66,7 +68,7 @@ Omitting `ignoreDirs` keeps the built-in list. When you provide it, include ever
 ## Path Handling
 
 - The picker indexes regular files and directories in the active workspace. Configured directory names and symbolic links are skipped.
-- File-name filters run during the Host index walk, before entries count toward `maxIndexedFiles` or reach the browser.
+- Global and workspace file-name filters are combined during the Host index walk, before entries count toward `maxIndexedFiles` or reach the browser.
 - The Host accepts workspace-relative paths. Absolute paths and paths that escape the workspace are ignored.
 - Reference markers are created only from user-authored text.
 - Clicking a referenced path uses the Harness `host.openPath` endpoint.

@@ -26,7 +26,13 @@ import { AtFileSection, type AtFileSectionInjected } from './SettingsSection.tsx
 import { NS, en, zh } from './locales.ts'
 import { adoptStyles } from './styles.ts'
 import { FolderNavigator, type FolderNavigatorInjected } from './FolderNavigator.tsx'
-import { DEFAULT_IGNORE_FILES, normalizeIgnoreFiles } from '../defaults.ts'
+import {
+  DEFAULT_IGNORE_FILES,
+  ignoreFilesSettingsKey,
+  normalizeIgnoreFiles,
+  normalizeWorkspaceIgnoreFiles,
+  workspacePathKey,
+} from '../defaults.ts'
 
 /** Required services: picker pipeline, session projection, carrier, Remote face, slots, locale, settings scope. */
 export const inject = ['inputTriggers', 'sessions', 'connection', 'remote', 'slots', 'locale', 'settingsScope']
@@ -95,7 +101,11 @@ export function apply(ctx: ClientContext): void {
   const syncSource = (): void => {
     const value = scope.getSnapshot().value
     const enabled = value?.enabled ?? true
-    const nextIgnoreFilesKey = normalizeIgnoreFiles(value?.ignoreFiles ?? DEFAULT_IGNORE_FILES).join('\n').toLowerCase()
+    const nextIgnoreFilesKey = ignoreFilesSettingsKey(value ?? {
+      enabled: true,
+      ignoreFiles: [...DEFAULT_IGNORE_FILES],
+      workspaceIgnoreFiles: [],
+    })
     if (ignoreFilesKey !== undefined && ignoreFilesKey !== nextIgnoreFilesKey) {
       invalidateAll()
       entryByRel.clear()
@@ -175,6 +185,14 @@ export function apply(ctx: ClientContext): void {
       hooks: { scope },
       setEnabled: async (enabled: boolean) => { await scope.set('enabled', enabled) },
       setIgnoreFiles: async (ignoreFiles: readonly string[]) => { await scope.set('ignoreFiles', [...ignoreFiles]) },
+      setWorkspaceIgnoreFiles: async (workspace: string, ignoreFiles: readonly string[]) => {
+        const current = normalizeWorkspaceIgnoreFiles(scope.getSnapshot().value?.workspaceIgnoreFiles ?? [])
+        const target = workspacePathKey(workspace)
+        const next = current.filter(entry => workspacePathKey(entry.workspace) !== target)
+        const normalized = normalizeIgnoreFiles(ignoreFiles)
+        if (normalized.length > 0) next.push({ workspace, ignoreFiles: normalized })
+        await scope.set('workspaceIgnoreFiles', next)
+      },
     }),
   }, AtFileSection))
 }

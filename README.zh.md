@@ -39,12 +39,14 @@ DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `
 ## 安装或更新
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.4.1.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.5.0.tar.gz
 ```
 
-已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.4.1`。
+已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.5.0`。
 
-插件开关位于 **设置 -> 文件提及**。同一页面可以编辑忽略文件名列表，每行填写一个完整文件名，匹配时不区分大小写。保存后会清除已有索引缓存，下一次输入 `@` 时直接使用新设置，无需重启 DSH。清空列表即可取消文件名过滤。
+文件过滤位于 **设置 -> 文件提及**。**全局**页中的规则应用于所有工作区；**工作区**页为选定工作区添加单独的规则，并继续应用全局规则。每条规则填写一个完整文件名，匹配时不区分大小写。
+
+规则可以逐项添加和删除。全局列表可以恢复内置默认值，清空工作区列表不会影响其他工作区。每次修改都会清除已有索引缓存，下一次输入 `@` 时立即使用新规则。
 
 ## 配置
 
@@ -66,7 +68,7 @@ dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/re
 ## 路径处理
 
 - 选择器索引当前工作区中的常规文件和目录，并跳过已配置的目录名与符号链接。
-- 文件名过滤在 Host 遍历工作区时执行，被过滤的条目不会占用 `maxIndexedFiles`，也不会发送到浏览器。
+- Host 遍历工作区时会合并全局和当前工作区的文件名规则。被过滤的条目不会占用 `maxIndexedFiles`，也不会发送到浏览器。
 - Host 接受工作区相对路径。绝对路径以及越出工作区的路径会被忽略。
 - 只有用户输入的文本可以生成引用消息。
 - 点击引用路径时会调用 Harness 的 `host.openPath` 端点。

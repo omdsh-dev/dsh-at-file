@@ -1,3 +1,5 @@
+import type { AtFileSettings, WorkspaceIgnoreFiles } from './contract.ts'
+
 /** Directory basenames omitted from the picker unless the profile supplies its own list. */
 export const DEFAULT_IGNORE_DIRS = [
   '.git',
@@ -81,4 +83,68 @@ export function normalizeIgnoreFiles(values: readonly string[]): string[] {
     normalized.push(name)
   }
   return normalized
+}
+
+/** Stable comparison key for one canonical workspace path. */
+export function workspacePathKey(value: string): string {
+  const slashed = value.replace(/\\/gu, '/')
+  const withoutTrailing = slashed === '/' || /^[a-z]:\/$/iu.test(slashed)
+    ? slashed
+    : slashed.replace(/\/+$/u, '')
+  return /^[a-z]:\//iu.test(withoutTrailing) || withoutTrailing.startsWith('//')
+    ? withoutTrailing.toLowerCase()
+    : withoutTrailing
+}
+
+/** Merge duplicate workspace rows and normalize every file-name list. */
+export function normalizeWorkspaceIgnoreFiles(
+  entries: readonly WorkspaceIgnoreFiles[],
+): WorkspaceIgnoreFiles[] {
+  const order: string[] = []
+  const byWorkspace = new Map<string, WorkspaceIgnoreFiles>()
+  for (const entry of entries) {
+    const key = workspacePathKey(entry.workspace)
+    if (key === '') continue
+    const current = byWorkspace.get(key)
+    if (current === undefined) order.push(key)
+    byWorkspace.set(key, {
+      workspace: current?.workspace ?? entry.workspace,
+      ignoreFiles: normalizeIgnoreFiles([
+        ...(current?.ignoreFiles ?? []),
+        ...entry.ignoreFiles,
+      ]),
+    })
+  }
+  return order.map(key => byWorkspace.get(key) as WorkspaceIgnoreFiles)
+}
+
+/** Workspace-local file-name filters for one canonical cwd. */
+export function workspaceIgnoreFilesFor(
+  entries: readonly WorkspaceIgnoreFiles[],
+  workspace: string,
+): string[] {
+  const key = workspacePathKey(workspace)
+  const entry = normalizeWorkspaceIgnoreFiles(entries)
+    .find(candidate => workspacePathKey(candidate.workspace) === key)
+  return entry?.ignoreFiles ?? []
+}
+
+/** Effective file-name filters for one workspace: global rules plus local additions. */
+export function effectiveIgnoreFiles(settings: AtFileSettings, workspace: string): string[] {
+  return normalizeIgnoreFiles([
+    ...settings.ignoreFiles,
+    ...workspaceIgnoreFilesFor(settings.workspaceIgnoreFiles ?? [], workspace),
+  ])
+}
+
+/** Stable cache key covering every file-name filter setting. */
+export function ignoreFilesSettingsKey(settings: AtFileSettings): string {
+  const global = normalizeIgnoreFiles(settings.ignoreFiles).map(name => name.toLowerCase()).sort()
+  const workspaces = normalizeWorkspaceIgnoreFiles(settings.workspaceIgnoreFiles ?? [])
+    .map(entry => ({
+      workspace: workspacePathKey(entry.workspace),
+      ignoreFiles: entry.ignoreFiles.map(name => name.toLowerCase()).sort(),
+    }))
+    .sort((left, right) => left.workspace.localeCompare(right.workspace))
+  return JSON.stringify({ global, workspaces })
 }
