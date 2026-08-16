@@ -1,7 +1,7 @@
 {
   "name": "dsh-at-file",
   "description": "Codex-style @path references for the DeepSeek Harness web GUI: search workspace paths without injecting file content",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
