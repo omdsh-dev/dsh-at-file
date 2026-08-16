@@ -12,10 +12,19 @@ export const STYLE_ID = 'dsh-at-file-style'
 /** The dock's injected stylesheet text. */
 export const cssText = `
 .dsh_atFile_rail {
+  box-sizing: border-box;
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   gap: 6px;
+  width: calc(
+    100% -
+    var(--dsh-composer-side-clearance) -
+    var(--dsh-composer-side-clearance)
+  );
+  max-width: var(--dsh-composer-card-max-width);
   min-width: 0;
+  margin: 0 auto;
 }
 .dsh_atFile_row {
   display: inline-flex;

@@ -537,6 +537,8 @@ describe('dsh-at-file client apply', () => {
     const style = document.getElementById(STYLE_ID)
     expect(style).not.toBeNull()
     expect(style!.textContent).toContain('dsh_atFile_rail')
+    expect(style!.textContent).toContain('var(--dsh-composer-side-clearance)')
+    expect(style!.textContent).toContain('max-width: var(--dsh-composer-card-max-width)')
     await boot()
     expect(document.querySelectorAll(`#${STYLE_ID}`)).toHaveLength(1)
   })
