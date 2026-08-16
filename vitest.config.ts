@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { defineConfig } from 'vitest/config'
 
-const dsh = (relative) => fileURLToPath(new URL(`../dsh/${relative}`, import.meta.url))
+const dsh = (relative) => fileURLToPath(new URL(`../deepseek-harness/${relative}`, import.meta.url))
 
 const decoratorSyntax = /@(?:Remote|RemoteScope)\b/
 

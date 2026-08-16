@@ -102,7 +102,7 @@ pnpm run test
 pnpm run build
 ```
 
-开发环境默认 Harness 仓库位于 `../dsh`。`lib/` 中的构建产物会提交到仓库，因此 profile 安装过程无需运行包构建脚本。
+开发环境默认官方 `deepseek-ai/deepseek-harness` 仓库位于 `../deepseek-harness`，与该仓库的默认克隆目录一致。`lib/` 中的构建产物会提交到仓库，因此 profile 安装过程无需运行包构建脚本。
 
 ## License
 

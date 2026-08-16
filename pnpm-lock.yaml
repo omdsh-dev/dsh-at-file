@@ -13,53 +13,53 @@ importers:
         version: 4.4.3
     devDependencies:
       '@deepseek-ai/cordis':
-        specifier: link:../dsh/vendor/cordis
-        version: link:../dsh/vendor/cordis
+        specifier: link:../deepseek-harness/vendor/cordis
+        version: link:../deepseek-harness/vendor/cordis
       '@deepseek-ai/dsh-agent':
-        specifier: link:../dsh/packages/core/agent
-        version: link:../dsh/packages/core/agent
+        specifier: link:../deepseek-harness/packages/core/agent
+        version: link:../deepseek-harness/packages/core/agent
       '@deepseek-ai/dsh-api-remotes':
-        specifier: link:../dsh/packages/api/remotes
-        version: link:../dsh/packages/api/remotes
+        specifier: link:../deepseek-harness/packages/api/remotes
+        version: link:../deepseek-harness/packages/api/remotes
       '@deepseek-ai/dsh-client-connection':
-        specifier: link:../dsh/packages/client/connection
-        version: link:../dsh/packages/client/connection
+        specifier: link:../deepseek-harness/packages/client/connection
+        version: link:../deepseek-harness/packages/client/connection
       '@deepseek-ai/dsh-client-locale':
-        specifier: link:../dsh/packages/client/locale
-        version: link:../dsh/packages/client/locale
+        specifier: link:../deepseek-harness/packages/client/locale
+        version: link:../deepseek-harness/packages/client/locale
       '@deepseek-ai/dsh-client-runtime':
-        specifier: link:../dsh/packages/client/runtime
-        version: link:../dsh/packages/client/runtime
+        specifier: link:../deepseek-harness/packages/client/runtime
+        version: link:../deepseek-harness/packages/client/runtime
       '@deepseek-ai/dsh-client-ui-conversation':
-        specifier: link:../dsh/packages/client/ui-conversation
-        version: link:../dsh/packages/client/ui-conversation
+        specifier: link:../deepseek-harness/packages/client/ui-conversation
+        version: link:../deepseek-harness/packages/client/ui-conversation
       '@deepseek-ai/dsh-client-ui-input-trigger':
-        specifier: link:../dsh/packages/client/ui-input-trigger
-        version: link:../dsh/packages/client/ui-input-trigger
+        specifier: link:../deepseek-harness/packages/client/ui-input-trigger
+        version: link:../deepseek-harness/packages/client/ui-input-trigger
       '@deepseek-ai/dsh-client-ui-settings':
-        specifier: link:../dsh/packages/client/ui-settings
-        version: link:../dsh/packages/client/ui-settings
+        specifier: link:../deepseek-harness/packages/client/ui-settings
+        version: link:../deepseek-harness/packages/client/ui-settings
       '@deepseek-ai/dsh-client-ui-slots':
-        specifier: link:../dsh/packages/client/ui-slots
-        version: link:../dsh/packages/client/ui-slots
+        specifier: link:../deepseek-harness/packages/client/ui-slots
+        version: link:../deepseek-harness/packages/client/ui-slots
       '@deepseek-ai/dsh-invariants':
-        specifier: link:../dsh/packages/runtime-diagnostics/invariants
-        version: link:../dsh/packages/runtime-diagnostics/invariants
+        specifier: link:../deepseek-harness/packages/runtime-diagnostics/invariants
+        version: link:../deepseek-harness/packages/runtime-diagnostics/invariants
       '@deepseek-ai/dsh-llm':
-        specifier: link:../dsh/packages/llm/llm
-        version: link:../dsh/packages/llm/llm
+        specifier: link:../deepseek-harness/packages/llm/llm
+        version: link:../deepseek-harness/packages/llm/llm
       '@deepseek-ai/dsh-settings':
-        specifier: link:../dsh/packages/settings/settings
-        version: link:../dsh/packages/settings/settings
+        specifier: link:../deepseek-harness/packages/settings/settings
+        version: link:../deepseek-harness/packages/settings/settings
       '@deepseek-ai/dsh-typert-protocol':
-        specifier: link:../dsh/packages/typert/protocol
-        version: link:../dsh/packages/typert/protocol
+        specifier: link:../deepseek-harness/packages/typert/protocol
+        version: link:../deepseek-harness/packages/typert/protocol
       '@deepseek-ai/dsh-typert-registry':
-        specifier: link:../dsh/packages/typert/registry
-        version: link:../dsh/packages/typert/registry
+        specifier: link:../deepseek-harness/packages/typert/registry
+        version: link:../deepseek-harness/packages/typert/registry
       '@deepseek-ai/schemastery':
-        specifier: link:../dsh/vendor/schemastery
-        version: link:../dsh/vendor/schemastery
+        specifier: link:../deepseek-harness/vendor/schemastery
+        version: link:../deepseek-harness/vendor/schemastery
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3

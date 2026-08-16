@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Out-of-tree DeepSeek Harness plugin (host + Web client bundle). Read [dsh-plugin-create](../../dsh/.agents/skills/dsh-plugin-create/SKILL.md) for the recipe this repo follows; the harness checkout sits at `../dsh`.
+Out-of-tree DeepSeek Harness plugin (host + Web client bundle). Read [dsh-plugin-create](../deepseek-harness/.agents/skills/dsh-plugin-create/SKILL.md) for the recipe this repo follows; the harness checkout sits at `../deepseek-harness`.
 
 ## Layout
 

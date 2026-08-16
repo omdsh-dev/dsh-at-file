@@ -102,7 +102,7 @@ pnpm run test
 pnpm run build
 ```
 
-The development setup expects the Harness checkout at `../dsh`. Built files under `lib/` are committed so profile installation does not require package build scripts.
+The development setup expects the official `deepseek-ai/deepseek-harness` repository at `../deepseek-harness`, its default clone directory. Built files under `lib/` are committed so profile installation does not require package build scripts.
 
 ## License
 
