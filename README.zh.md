@@ -2,7 +2,9 @@
 
 DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `@`，可以搜索当前工作区并插入文件或目录路径。
 
-![@ 路径选择器](assets/screenshots/path-picker.png)
+![@ 路径选择器](assets/screenshots/workspace-path-picker.png)
+
+![输入框中的文件引用](assets/screenshots/file-mention-composer.png)
 
 ## 使用方式
 
@@ -48,7 +50,7 @@ dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/re
 
 在 **设置 -> 文件提及** 中管理文件名过滤规则。
 
-![包含 Exact 和 Regex 规则的文件过滤设置](assets/screenshots/file-filter-settings.png)
+![包含 Exact 和 Regex 规则的文件提及设置](assets/screenshots/file-mention-settings.png)
 
 - **全局** 保存所有工作区共用的规则。
 - **工作区** 保存当前所选工作区路径的附加规则。每个工作区都有独立列表，面板中会同时显示该工作区继承的全局规则。

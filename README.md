@@ -2,7 +2,9 @@
 
 Workspace path references for the DeepSeek Harness web interface. Type `@` in the composer to search the current workspace and insert a file or directory path.
 
-![@ path picker](assets/screenshots/path-picker.png)
+![@ path picker](assets/screenshots/workspace-path-picker.png)
+
+![File reference in the composer](assets/screenshots/file-mention-composer.png)
 
 ## Usage
 
@@ -48,7 +50,7 @@ Use the same command to update an existing installation. Restart `dsh web` after
 
 Open **Settings -> File mentions** to manage file-name filters.
 
-![File filter settings with Exact and Regex rules](assets/screenshots/file-filter-settings.png)
+![File mention settings with Exact and Regex rules](assets/screenshots/file-mention-settings.png)
 
 - **Global** contains rules shared by every workspace.
 - **Workspace** contains additional rules for the selected workspace path. Each workspace keeps its own list, and the panel shows the global rules it inherits.
