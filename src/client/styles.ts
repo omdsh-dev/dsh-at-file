@@ -473,6 +473,10 @@ export function adoptStyles(): void {
   if (document.getElementById(STYLE_ID) !== null) return
   const style = document.createElement('style')
   style.id = STYLE_ID
+  // Mark ownership explicitly so DSH client HMR cannot attribute this tag to
+  // whichever plugin happens to materialize after dsh-at-file.
+  style.dataset.plugin = 'dsh-at-file'
+  style.dataset.pluginCss = STYLE_ID
   style.textContent = cssText
   document.head.appendChild(style)
 }

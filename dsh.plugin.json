@@ -1,7 +1,7 @@
 {
   "name": "dsh-at-file",
   "description": "Codex-style @path references for the DeepSeek Harness web GUI",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "entry": {
     "name": "dsh-at-file",
     "inject": []
