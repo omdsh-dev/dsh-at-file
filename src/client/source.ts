@@ -13,6 +13,7 @@ import { basenameOf, dirnameOf } from './model.ts'
 import { rankFiles } from './search.ts'
 import { fileIcon } from './icons.tsx'
 import type { FileEntry } from './remote.ts'
+import { PASTED_MENTION_MARKER } from '../paste.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-input-trigger/client' {
   interface InputTriggerCandidate {
@@ -161,6 +162,9 @@ export function createAtFileSource(deps: AtFileSourceDeps): AtFileSource {
     trigger: '@',
     name: SOURCE_NAME,
     async candidates(session, { query, signal }) {
+      // A protected query came from pasted text. Keep the menu closed from the
+      // plugin's point of view instead of treating it as a file lookup.
+      if (query.includes(PASTED_MENTION_MARKER)) return []
       const files = await fetchIndex(session.sessionId, signal)
       if (signal.aborted) return []
       return candidateRows(rankFiles(files, query, MAX_CANDIDATES))

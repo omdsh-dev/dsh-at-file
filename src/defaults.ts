@@ -77,6 +77,7 @@ export function defaultAtFileSettings(): AtFileSettings {
     enabled: true,
     ignoreFiles: [...DEFAULT_IGNORE_FILES],
     workspaceIgnoreFiles: [],
+    ignorePastedMentions: true,
   }
 }
 

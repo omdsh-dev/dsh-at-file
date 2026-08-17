@@ -10,6 +10,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import type { ReactElement } from 'react'
 import { draftMentions, FilesDock, withoutToken, type AtFileDockProps } from '../src/client/FilesDock.tsx'
 import { fmt, zh } from '../src/client/locales.ts'
+import { protectPastedMentions } from '../src/paste.ts'
 
 // jsdom + React 18 without the act harness: flushSync commits renders, and
 // plain clicks dispatch real handlers.
@@ -89,6 +90,12 @@ describe('FilesDock', () => {
 
   it('renders nothing when the draft has no @path tokens', () => {
     const { root, container } = mount(<FilesDock {...props({ draft: 'plain text' })} />)
+    expect(container.querySelectorAll('[data-at-file-row]')).toHaveLength(0)
+    root.unmount()
+  })
+
+  it('does not render protected pasted tokens', () => {
+    const { root, container } = mount(<FilesDock {...props({ draft: protectPastedMentions('@a.ts') })} />)
     expect(container.querySelectorAll('[data-at-file-row]')).toHaveLength(0)
     root.unmount()
   })

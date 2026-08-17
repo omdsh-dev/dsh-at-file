@@ -24,6 +24,7 @@ interface BootOptions {
   atFileUpdateSettings?: (update: AtFileSettingsUpdate) => Promise<RemoteResult<AtFileSettings>>
   openPath?: () => Promise<{ result: { ok: true } | { ok: false; error: { message: string } } }>
   enabled?: boolean
+  ignorePastedMentions?: boolean
   ignoreFiles?: readonly string[]
   workspaceIgnoreFiles?: readonly WorkspaceIgnoreFiles[]
   withoutNamespace?: boolean
@@ -52,6 +53,7 @@ async function boot(options: BootOptions = {}) {
       workspace: entry.workspace,
       ignoreFiles: [...entry.ignoreFiles],
     })),
+    ignorePastedMentions: options.ignorePastedMentions ?? true,
   }
   const getSettings = vi.fn(options.atFileGetSettings ?? (async () => ({ ok: true as const, value: settings })))
   const updateSettings = vi.fn(options.atFileUpdateSettings ?? (async (update: AtFileSettingsUpdate) => {
@@ -103,6 +105,7 @@ interface RegisteredSettingsSection {
   inject: () => {
     hooks: { scope: { getSnapshot: () => { value: AtFileSettings } } }
     setEnabled: (enabled: boolean) => Promise<void>
+    setIgnorePastedMentions: (ignore: boolean) => Promise<void>
     setIgnoreFiles: (ignoreFiles: readonly string[]) => Promise<void>
     setWorkspaceIgnoreFiles: (workspace: string, ignoreFiles: readonly string[]) => Promise<void>
   }
@@ -413,6 +416,8 @@ describe('dsh-at-file client apply', () => {
     expect(section.label()).toBe('nav')
     await section.inject().setEnabled(false)
     expect(booted.updateSettings).toHaveBeenCalledWith({ field: 'enabled', value: false })
+    await section.inject().setIgnorePastedMentions(false)
+    expect(booted.updateSettings).toHaveBeenCalledWith({ field: 'ignorePastedMentions', value: false })
     await section.inject().setIgnoreFiles(['desktop.ini'])
     expect(booted.updateSettings).toHaveBeenCalledWith({ field: 'ignoreFiles', value: ['desktop.ini'] })
     await section.inject().setWorkspaceIgnoreFiles('/work/a', ['local.tmp'])

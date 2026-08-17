@@ -11,6 +11,8 @@ export declare const zh: {
     'settings.subtitle': string;
     'settings.enabled': string;
     'settings.enabledDesc': string;
+    'settings.ignorePastedMentions': string;
+    'settings.ignorePastedMentionsDesc': string;
     'settings.ignoreFiles': string;
     'settings.ignoreFilesDesc': string;
     'settings.scope': string;
@@ -56,6 +58,8 @@ export declare const en: {
     'settings.subtitle': string;
     'settings.enabled': string;
     'settings.enabledDesc': string;
+    'settings.ignorePastedMentions': string;
+    'settings.ignorePastedMentionsDesc': string;
     'settings.ignoreFiles': string;
     'settings.ignoreFilesDesc': string;
     'settings.scope': string;

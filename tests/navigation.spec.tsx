@@ -9,6 +9,7 @@ import {
   FolderNavigator, folderNavigationTarget, isFolderNavigationKey,
   type FolderNavigationInput, type FolderNavigatorProps,
 } from '../src/client/FolderNavigator.tsx'
+import { PASTED_MENTION_MARKER } from '../src/paste.ts'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = false
 
@@ -119,6 +120,17 @@ describe('folder navigation decision', () => {
 })
 
 describe('FolderNavigator DOM bridge', () => {
+  it('marks @ tokens in pasted text before InputBar reads the clipboard', () => {
+    const mounted = mount()
+    const clipboard = { getData: vi.fn(() => 'please inspect @README.md') }
+    const event = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(event, 'clipboardData', { value: clipboard })
+    Object.defineProperty(event, 'target', { value: mounted.textarea })
+    mounted.textarea.dispatchEvent(event)
+    expect(clipboard.getData('text/plain')).toBe(`please inspect @${PASTED_MENTION_MARKER}README.md`)
+    mounted.root.unmount()
+  })
+
   it('enters a highlighted directory, keeps the menu tracked, and restores the caret', () => {
     const mounted = mount()
     mounted.textarea.setSelectionRange(4, 4)

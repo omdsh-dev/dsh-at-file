@@ -1,6 +1,7 @@
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import type { MenuState, TriggerGuard } from '@deepseek-ai/dsh-client-ui-input-trigger/client';
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client';
+import type { AtFileSettingsSource } from './FilesDock.tsx';
 /** Controller surface required by the navigation bridge. */
 export interface FolderNavigationController {
     readonly menu: SnapshotStore<MenuState>;
@@ -9,6 +10,9 @@ export interface FolderNavigationController {
 /** Injected controller for the current session. */
 export interface FolderNavigatorInjected {
     readonly controller: FolderNavigationController;
+    readonly hooks: {
+        scope: AtFileSettingsSource;
+    };
 }
 /** Overlay entry props: session input state/actions plus the trigger controller. */
 export type FolderNavigatorProps = PropsRuntime<'conversation.input.overlay'> & InjectFace<FolderNavigatorInjected>;
@@ -34,4 +38,4 @@ export declare function isFolderNavigationKey(event: Pick<KeyboardEvent, 'key' |
 /** Resolve the highlighted directory into an exact @path/ replacement. */
 export declare function folderNavigationTarget(menu: MenuState, input: FolderNavigationInput, selection: FolderNavigationSelection): FolderNavigationTarget | undefined;
 /** Invisible overlay entry that consumes ArrowRight only for highlighted directories. */
-export declare function FolderNavigator({ controller, useInput, inputActions }: FolderNavigatorProps): null;
+export declare function FolderNavigator({ controller, useInput, inputActions, useScope }: FolderNavigatorProps): null;

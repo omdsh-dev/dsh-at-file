@@ -69,10 +69,12 @@ export function apply(ctx: Context, config?: Config): void {
       await settings.update({ enabled: update.value })
     } else if (update.field === 'ignoreFiles') {
       await settings.update({ ignoreFiles: normalizeIgnoreFiles(update.value) })
-    } else {
+    } else if (update.field === 'workspaceIgnoreFiles') {
       await settings.update({
         workspaceIgnoreFiles: normalizeWorkspaceIgnoreFiles(update.value),
       })
+    } else {
+      await settings.update({ ignorePastedMentions: update.value })
     }
     return settings.get()
   }
@@ -93,7 +95,14 @@ export function apply(ctx: Context, config?: Config): void {
   ctx.on('agent/created', ({ agent }) => {
     agent.ctx.effect(() => {
       const stop = agent.ctx.on('agent/pre-step', async ({ messages, signal }, next) => {
-        return mentionPreStep(agent, () => settings.get().enabled, messages, signal, next)
+        return mentionPreStep(
+          agent,
+          () => settings.get().enabled,
+          messages,
+          signal,
+          next,
+          () => settings.get().ignorePastedMentions ?? true,
+        )
       })
       return () => { stop() }
     }, 'dsh-at-file: pre-step path references')

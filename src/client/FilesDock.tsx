@@ -10,6 +10,7 @@
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import type { AtFileSettings } from '../contract.ts'
+import { isProtectedMentionToken } from '../paste.ts'
 
 export interface AtFileSettingsSnapshot { readonly value: AtFileSettings }
 export type AtFileSettingsSource = ObservableSnapshot<AtFileSettingsSnapshot>
@@ -39,6 +40,7 @@ export function draftMentions(draft: string): readonly DraftMention[] {
   const out: DraftMention[] = []
   for (const match of draft.matchAll(MENTION_PATTERN)) {
     const raw = match[1] as string
+    if (isProtectedMentionToken(raw)) continue
     const relative = raw.endsWith('/') ? raw.slice(0, -1) : raw
     if (relative === '' || seen.has(relative)) continue
     seen.add(relative)

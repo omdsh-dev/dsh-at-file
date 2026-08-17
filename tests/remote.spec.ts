@@ -36,6 +36,8 @@ describe('AT_FILE_REMOTE', () => {
     expect(update.parameters[0]).toMatchObject({ name: 'update', wire: 'update', source: 'json' })
     const schema = update.parameters[0]!.codec.schema as { parse(value: unknown): unknown }
     expect(schema.parse({ field: 'enabled', value: false })).toEqual({ field: 'enabled', value: false })
+    expect(schema.parse({ field: 'ignorePastedMentions', value: false }))
+      .toEqual({ field: 'ignorePastedMentions', value: false })
     expect(schema.parse({ field: 'workspaceIgnoreFiles', value: [{ workspace: '/ws', ignoreFiles: ['a.tmp'] }] }))
       .toEqual({ field: 'workspaceIgnoreFiles', value: [{ workspace: '/ws', ignoreFiles: ['a.tmp'] }] })
     expect(schema.parse({
@@ -69,7 +71,7 @@ describe('AT_FILE_REMOTE', () => {
   it('settings codecs reject incomplete resolved sections', () => {
     const schema = AT_FILE_REMOTE.descriptors[1]!.result.schema as { parse(value: unknown): unknown }
     expect(schema.parse({ enabled: true, ignoreFiles: [], workspaceIgnoreFiles: [] }))
-      .toEqual({ enabled: true, ignoreFiles: [], workspaceIgnoreFiles: [] })
+      .toEqual({ enabled: true, ignoreFiles: [], workspaceIgnoreFiles: [], ignorePastedMentions: true })
     expect(() => schema.parse({ enabled: true, ignoreFiles: [] })).toThrow()
   })
 })

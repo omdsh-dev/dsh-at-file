@@ -10,6 +10,7 @@ import { createAtFileSource, INDEX_TTL_MS, MAX_CANDIDATES, SOURCE_NAME } from '.
 import type { FileEntry } from '../src/client/remote.ts'
 import { fileIconKind } from '../src/client/icons.tsx'
 import { fmt } from '../src/client/locales.ts'
+import { protectPastedMentions } from '../src/paste.ts'
 
 const sid = (value: string): SessionId => value as SessionId
 const session = (id: string): ClientSessionContext => ({ sessionId: sid(id) })
@@ -29,6 +30,16 @@ function harness(overrides: Partial<ConstructorParameters<typeof createAtFileSou
 }
 
 describe('@file candidates', () => {
+  it('does not search for a token that came from pasted text', async () => {
+    const { source, search } = harness()
+    const rows = await source.candidates(session('s1'), {
+      query: protectPastedMentions('@README.md').slice(1),
+      position: 'inline',
+      signal: new AbortController().signal,
+    })
+    expect(rows).toEqual([])
+    expect(search).not.toHaveBeenCalled()
+  })
   it('fetches the session index once and filters per keystroke locally', async () => {
     const { source, search } = harness()
     const first = await source.candidates(session('s1'), { query: 'view', position: 'inline', signal: new AbortController().signal })

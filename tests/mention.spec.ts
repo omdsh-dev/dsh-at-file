@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { expandMentions, mentionPreStep, scanMentions } from '../src/mention.ts'
+import { protectPastedMentions } from '../src/paste.ts'
 
 function user(text: string): UserMessage {
   return createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } })
@@ -18,6 +19,12 @@ describe('scanMentions', () => {
   it('recognizes @path tokens, strips the directory slash, and deduplicates', () => {
     expect(scanMentions('fix @src/index.ts and @docs/ ')).toEqual(['src/index.ts', 'docs'])
     expect(scanMentions('@a.ts again @a.ts')).toEqual(['a.ts'])
+  })
+
+  it('skips protected pasted tokens by default and restores them when the setting is off', () => {
+    const pasted = protectPastedMentions('read @a.ts')
+    expect(scanMentions(pasted)).toEqual([])
+    expect(scanMentions(pasted, false)).toEqual(['a.ts'])
   })
 })
 
@@ -178,5 +185,46 @@ describe('mentionPreStep', () => {
     expect(rejected.kind).toBe('reject')
     const unmatched = await mentionPreStep(agent, () => true, [user('@missing.ts')], new AbortController().signal, decision)
     expect(unmatched.messages).toEqual([])
+  })
+
+  it('does not inject or expose pasted references when the setting is enabled', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-mention-'))
+    await writeFile(join(root, 'a.ts'), 'x\n')
+    try {
+      const pasted = protectPastedMentions('please keep @a.ts as text')
+      const decision = await mentionPreStep(
+        { session: { header: { cwd: root } } },
+        () => true,
+        [user(pasted)],
+        new AbortController().signal,
+        async () => ({ kind: 'enter', messages: [user(pasted)] }),
+      )
+      expect(decision.kind).toBe('enter')
+      expect(decision.messages).toHaveLength(1)
+      expect(decision.messages[0]!.content[0]).toEqual({ type: 'text', text: 'please keep @a.ts as text' })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('restores the legacy behavior when pasted-mention filtering is disabled', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-mention-'))
+    await writeFile(join(root, 'a.ts'), 'x\n')
+    try {
+      const pasted = protectPastedMentions('read @a.ts')
+      const decision = await mentionPreStep(
+        { session: { header: { cwd: root } } },
+        () => true,
+        [user(pasted)],
+        new AbortController().signal,
+        async () => ({ kind: 'enter', messages: [] }),
+        () => false,
+      )
+      expect(decision.kind).toBe('enter')
+      expect(decision.messages).toHaveLength(1)
+      expect(decision.messages[0]!.source).toEqual({ kind: 'at-file-mention', relative: 'a.ts' })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

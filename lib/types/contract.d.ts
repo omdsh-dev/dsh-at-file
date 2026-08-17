@@ -36,6 +36,8 @@ export interface AtFileSettings {
     readonly ignoreFiles: FileIgnoreRuleInput[];
     /** Workspace-specific filters added to the global filters. */
     readonly workspaceIgnoreFiles: WorkspaceIgnoreFiles[];
+    /** Whether @ tokens inserted through paste stay ordinary text. */
+    readonly ignorePastedMentions?: boolean;
 }
 /** One field update sent through the plugin-owned settings Remote. */
 export type AtFileSettingsUpdate = {
@@ -47,6 +49,9 @@ export type AtFileSettingsUpdate = {
 } | {
     readonly field: 'workspaceIgnoreFiles';
     readonly value: WorkspaceIgnoreFiles[];
+} | {
+    readonly field: 'ignorePastedMentions';
+    readonly value: boolean;
 };
 /** Wire codec: one session identity (branded string on the wire). */
 export declare const sessionIdSchema: z.ZodString;
@@ -111,6 +116,7 @@ export declare const atFileSettingsSchema: z.ZodReadonly<z.ZodObject<{
             caseSensitive: z.ZodBoolean;
         }, z.core.$strip>>]>>;
     }, z.core.$strip>>>;
+    ignorePastedMentions: z.ZodDefault<z.ZodBoolean>;
 }, z.core.$strip>>;
 /** Strict wire codec for one field update. */
 export declare const atFileSettingsUpdateSchema: z.ZodDiscriminatedUnion<[z.ZodReadonly<z.ZodObject<{
@@ -139,6 +145,9 @@ export declare const atFileSettingsUpdateSchema: z.ZodDiscriminatedUnion<[z.ZodR
             caseSensitive: z.ZodBoolean;
         }, z.core.$strip>>]>>;
     }, z.core.$strip>>>;
+}, z.core.$strip>>, z.ZodReadonly<z.ZodObject<{
+    field: z.ZodLiteral<"ignorePastedMentions">;
+    value: z.ZodBoolean;
 }, z.core.$strip>>], "field">;
 /** The atFile Remote namespace's strict invocation descriptors. */
 export declare const AT_FILE_INVOCATIONS: readonly InvocationDescriptor[];

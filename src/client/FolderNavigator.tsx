@@ -6,6 +6,8 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { SOURCE_NAME } from './source.ts'
+import { protectPastedMentions } from '../paste.ts'
+import type { AtFileSettingsSource } from './FilesDock.tsx'
 
 /** Controller surface required by the navigation bridge. */
 export interface FolderNavigationController {
@@ -16,6 +18,7 @@ export interface FolderNavigationController {
 /** Injected controller for the current session. */
 export interface FolderNavigatorInjected {
   readonly controller: FolderNavigationController
+  readonly hooks: { scope: AtFileSettingsSource }
 }
 
 /** Overlay entry props: session input state/actions plus the trigger controller. */
@@ -82,8 +85,9 @@ interface PendingNavigation extends FolderNavigationTarget {
 }
 
 /** Invisible overlay entry that consumes ArrowRight only for highlighted directories. */
-export function FolderNavigator({ controller, useInput, inputActions }: FolderNavigatorProps) {
+export function FolderNavigator({ controller, useInput, inputActions, useScope }: FolderNavigatorProps) {
   const input = useInput(state => state)
+  const ignorePastedMentions = useScope?.(snapshot => snapshot.value?.ignorePastedMentions ?? true) ?? true
   const pending = useRef<PendingNavigation | null>(null)
 
   useLayoutEffect(() => {
@@ -111,6 +115,33 @@ export function FolderNavigator({ controller, useInput, inputActions }: FolderNa
     document.addEventListener('keydown', onKeyDown, true)
     return () => { document.removeEventListener('keydown', onKeyDown, true) }
   }, [controller, input, inputActions])
+
+  useEffect(() => {
+    if (!ignorePastedMentions) return
+    const onPaste = (event: ClipboardEvent): void => {
+      if (!(event.target instanceof HTMLTextAreaElement)) return
+      const clipboard = event.clipboardData
+      if (clipboard === null) return
+      const originalGetData = clipboard.getData.bind(clipboard)
+      const text = originalGetData('text/plain')
+      const protectedText = protectPastedMentions(text)
+      if (protectedText === text) return
+      // InputBar owns the actual paste transaction and reads getData during
+      // the bubble phase. Patch only this event's DataTransfer so the visible
+      // draft stays unchanged while the Host can identify pasted mentions.
+      try {
+        Object.defineProperty(clipboard, 'getData', {
+          configurable: true,
+          value: (format: string) => format === 'text/plain' ? protectedText : originalGetData(format),
+        })
+      } catch {
+        // Some browsers expose a non-extensible DataTransfer. The normal
+        // picker behavior remains available; the Host marker is best effort.
+      }
+    }
+    document.addEventListener('paste', onPaste, true)
+    return () => { document.removeEventListener('paste', onPaste, true) }
+  }, [ignorePastedMentions])
 
   return null
 }

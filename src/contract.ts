@@ -41,6 +41,8 @@ export interface AtFileSettings {
   readonly ignoreFiles: FileIgnoreRuleInput[]
   /** Workspace-specific filters added to the global filters. */
   readonly workspaceIgnoreFiles: WorkspaceIgnoreFiles[]
+  /** Whether @ tokens inserted through paste stay ordinary text. */
+  readonly ignorePastedMentions?: boolean
 }
 
 /** One field update sent through the plugin-owned settings Remote. */
@@ -48,6 +50,7 @@ export type AtFileSettingsUpdate =
   | { readonly field: 'enabled'; readonly value: boolean }
   | { readonly field: 'ignoreFiles'; readonly value: FileIgnoreRuleInput[] }
   | { readonly field: 'workspaceIgnoreFiles'; readonly value: WorkspaceIgnoreFiles[] }
+  | { readonly field: 'ignorePastedMentions'; readonly value: boolean }
 
 /** Wire codec: one session identity (branded string on the wire). */
 export const sessionIdSchema = z.string().min(1)
@@ -89,6 +92,7 @@ export const atFileSettingsSchema = z.object({
   enabled: z.boolean(),
   ignoreFiles: z.array(fileIgnoreRuleInputSchema),
   workspaceIgnoreFiles: z.array(workspaceIgnoreFilesSchema),
+  ignorePastedMentions: z.boolean().default(true),
 }).readonly()
 
 /** Strict wire codec for one field update. */
@@ -99,6 +103,7 @@ export const atFileSettingsUpdateSchema = z.discriminatedUnion('field', [
     field: z.literal('workspaceIgnoreFiles'),
     value: z.array(workspaceIgnoreFilesSchema),
   }).readonly(),
+  z.object({ field: z.literal('ignorePastedMentions'), value: z.boolean() }).readonly(),
 ])
 
 /** The atFile Remote namespace's strict invocation descriptors. */

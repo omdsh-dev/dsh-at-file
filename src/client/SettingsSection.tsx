@@ -17,6 +17,7 @@ import {
 export interface AtFileSectionInjected {
   hooks: { scope: AtFileSettingsSource }
   setEnabled: (enabled: boolean) => Promise<void>
+  setIgnorePastedMentions: (ignore: boolean) => Promise<void>
   setIgnoreFiles: (ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
   setWorkspaceIgnoreFiles: (workspace: string, ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
 }
@@ -93,12 +94,14 @@ export function AtFileSection({
   useSessions,
   useWorkspaces,
   setEnabled,
+  setIgnorePastedMentions,
   setIgnoreFiles,
   setWorkspaceIgnoreFiles,
   t,
 }: AtFileSectionProps) {
   const settings = useScope(snapshot => snapshot.value)
   const enabled = settings?.enabled ?? true
+  const ignorePastedMentions = settings?.ignorePastedMentions ?? true
   const globalFiles = normalizeIgnoreFiles(settings?.ignoreFiles ?? DEFAULT_IGNORE_FILES)
   const workspaceRules = settings?.workspaceIgnoreFiles ?? []
   const workspaces = useWorkspaces(snapshot => snapshot.items)
@@ -194,6 +197,18 @@ export function AtFileSection({
         <span className="dsh_atFile_cardText">
           <span className="dsh_atFile_cardTitle">{t('settings.enabled')}</span>
           <span className="dsh_atFile_cardDesc">{t('settings.enabledDesc')}</span>
+        </span>
+      </label>
+      <label className="dsh_atFile_card">
+        <input
+          type="checkbox"
+          className="dsh_atFile_checkbox"
+          checked={ignorePastedMentions}
+          onChange={event => { void setIgnorePastedMentions(event.target.checked) }}
+        />
+        <span className="dsh_atFile_cardText">
+          <span className="dsh_atFile_cardTitle">{t('settings.ignorePastedMentions')}</span>
+          <span className="dsh_atFile_cardDesc">{t('settings.ignorePastedMentionsDesc')}</span>
         </span>
       </label>
       <div className="dsh_atFile_filter">

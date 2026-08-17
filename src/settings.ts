@@ -1,6 +1,6 @@
 /**
- * The `at-file` settings namespace: the durable enable switch and file-name
- * filters managed from the Web settings page. Registered with the settings
+ * The `at-file` settings namespace: the durable enable switch, pasted-mention
+ * policy, and file-name filters managed from the Web settings page. Registered with the settings
  * provider at plugin load; the runtime reads the owner scope's live value on
  * every call, so changes take effect without a restart.
  */
@@ -36,6 +36,7 @@ export const AtFileSettingsSchema: z<AtFileSettings> = z.object({
       }) as z<FileIgnoreRule>,
     ])),
   })).default([]),
+  ignorePastedMentions: z.boolean().default(true),
 })
 
 /**

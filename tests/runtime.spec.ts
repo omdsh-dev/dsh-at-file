@@ -68,6 +68,7 @@ describe('dsh-at-file host composition', () => {
       enabled: true,
       ignoreFiles: ['desktop.ini'],
       workspaceIgnoreFiles: [],
+      ignorePastedMentions: true,
     })
     expect(AtFileSettingsSchema({
       enabled: true,
@@ -83,6 +84,7 @@ describe('dsh-at-file host composition', () => {
         workspace: '/work',
         ignoreFiles: [{ kind: 'exact', pattern: 'Case.tmp', caseSensitive: true }],
       }],
+      ignorePastedMentions: true,
     })
   })
 

@@ -235,7 +235,7 @@ export function apply(ctx: ClientContext): void {
     inject: (sessionId): FolderNavigatorInjected => {
       const actx = sessions.scope(sessionId)
       if (actx === undefined) throw new Error(`dsh-at-file: session "${String(sessionId)}" has no client scope`)
-      return { controller: inputTriggers.sessionOf(actx) }
+      return { controller: inputTriggers.sessionOf(actx), hooks: { scope } }
     },
   }, FolderNavigator))
 
@@ -248,6 +248,9 @@ export function apply(ctx: ClientContext): void {
     inject: (): AtFileSectionInjected => ({
       hooks: { scope },
       setEnabled: async (enabled: boolean) => { await updateSettings({ field: 'enabled', value: enabled }) },
+      setIgnorePastedMentions: async (ignorePastedMentions: boolean) => {
+        await updateSettings({ field: 'ignorePastedMentions', value: ignorePastedMentions })
+      },
       setIgnoreFiles: async (ignoreFiles: readonly FileIgnoreRuleInput[]) => {
         await updateSettings({ field: 'ignoreFiles', value: [...ignoreFiles] })
       },

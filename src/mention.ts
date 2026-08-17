@@ -11,6 +11,7 @@ import { stat } from 'node:fs/promises'
 import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { PreStepDecision } from '@deepseek-ai/dsh-agent'
+import { isProtectedMentionToken, PASTED_MENTION_MARKER, stripPastedMentionMarkers } from './paste.ts'
 
 /** One recognized mention: its workspace-relative token and resolved kind. */
 export interface Mention {
@@ -38,12 +39,14 @@ const MENTION_PATTERN = /@([^\s@]+)/g
  * @param text - the message text block.
  * @returns unique workspace-relative tokens.
  */
-export function scanMentions(text: string): readonly string[] {
+export function scanMentions(text: string, ignorePastedMentions = true): readonly string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const match of text.matchAll(MENTION_PATTERN)) {
     const raw = match[1] as string
-    const relative = raw.endsWith('/') ? raw.slice(0, -1) : raw
+    if (ignorePastedMentions && isProtectedMentionToken(raw)) continue
+    const unmarked = ignorePastedMentions ? raw : stripPastedMentionMarkers(raw)
+    const relative = unmarked.endsWith('/') ? unmarked.slice(0, -1) : unmarked
     if (relative === '' || seen.has(relative)) continue
     seen.add(relative)
     out.push(relative)
@@ -104,6 +107,7 @@ export async function expandMentions(
   messages: readonly UserMessage[],
   cwd: string | undefined,
   signal: AbortSignal,
+  ignorePastedMentions = true,
 ): Promise<UserMessage[]> {
   if (cwd === undefined || !isAbsolute(cwd)) return []
   const tokens: string[] = []
@@ -111,7 +115,8 @@ export async function expandMentions(
     if (message.source.kind !== USER_SOURCE_KIND) continue
     for (const block of message.content) {
       if (block.type !== 'text') continue
-      tokens.push(...scanMentions(block.text))
+      const text = ignorePastedMentions ? block.text : stripPastedMentionMarkers(block.text)
+      tokens.push(...scanMentions(text, ignorePastedMentions))
     }
   }
   const injections: UserMessage[] = []
@@ -149,11 +154,29 @@ export async function mentionPreStep(
   messages: readonly UserMessage[],
   signal: AbortSignal,
   next: () => Promise<PreStepDecision>,
+  ignorePastedMentions: () => boolean = () => true,
 ): Promise<PreStepDecision> {
   const decision = await next()
   if (decision.kind === 'reject') return decision
-  if (!isEnabled()) return decision
-  const injections = await expandMentions(messages, agent.session.header.cwd, signal)
-  if (injections.length === 0) return decision
-  return { kind: 'enter', messages: [...decision.messages, ...injections] }
+  const pastedSetting = ignorePastedMentions()
+  const cleanMessages = pastedSetting
+    ? decision.messages.map(message => {
+      if (message.source.kind !== USER_SOURCE_KIND) return message
+      let changed = false
+      const content = message.content.map(block => {
+        if (block.type !== 'text' || !block.text.includes(PASTED_MENTION_MARKER)) return block
+        changed = true
+        return { ...block, text: stripPastedMentionMarkers(block.text) }
+      })
+      return changed ? { ...message, content } : message
+    })
+    : decision.messages
+  if (!isEnabled()) {
+    return cleanMessages === decision.messages ? decision : { kind: 'enter', messages: cleanMessages }
+  }
+  const injections = await expandMentions(messages, agent.session.header.cwd, signal, pastedSetting)
+  if (injections.length === 0) {
+    return cleanMessages === decision.messages ? decision : { kind: 'enter', messages: cleanMessages }
+  }
+  return { kind: 'enter', messages: [...cleanMessages, ...injections] }
 }

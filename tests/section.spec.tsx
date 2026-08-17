@@ -29,12 +29,14 @@ function workspace(workspaceId: string, path: string, title: string): WorkspaceS
 function props(over: {
   unloaded?: boolean
   enabled?: boolean
+  ignorePastedMentions?: boolean
   ignoreFiles?: readonly FileIgnoreRuleInput[]
   workspaceIgnoreFiles?: readonly WorkspaceIgnoreFiles[]
   workspaces?: readonly WorkspaceStub[]
   currentCwd?: string
   recentWorkspaceId?: string
   setEnabled?: (enabled: boolean) => Promise<void>
+  setIgnorePastedMentions?: (ignore: boolean) => Promise<void>
   setIgnoreFiles?: (ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
   setWorkspaceIgnoreFiles?: (workspace: string, ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
 } = {}): AtFileSectionProps {
@@ -47,6 +49,7 @@ function props(over: {
           workspace: entry.workspace,
           ignoreFiles: [...entry.ignoreFiles],
         })),
+        ignorePastedMentions: over.ignorePastedMentions ?? true,
       }
   const items = [...over.workspaces ?? []]
   const sessionState = over.currentCwd === undefined
@@ -60,6 +63,7 @@ function props(over: {
       recentWorkspaceId?: string
     }) => T): T => selector({ items, recentWorkspaceId: over.recentWorkspaceId }),
     setEnabled: over.setEnabled ?? (async () => {}),
+    setIgnorePastedMentions: over.setIgnorePastedMentions ?? (async () => {}),
     setIgnoreFiles: over.setIgnoreFiles ?? (async () => {}),
     setWorkspaceIgnoreFiles: over.setWorkspaceIgnoreFiles ?? (async () => {}),
     close: () => {},
@@ -105,6 +109,16 @@ describe('AtFileSection', () => {
     expect(checkbox.checked).toBe(true)
     click(checkbox)
     expect(setEnabled).toHaveBeenCalledWith(false)
+    root.unmount()
+  })
+
+  it('defaults the pasted-mention filter on and writes its next value', () => {
+    const setIgnorePastedMentions = vi.fn(async () => {})
+    const { root, container } = mount(<AtFileSection {...props({ setIgnorePastedMentions })} />)
+    const checkboxes = [...container.querySelectorAll('input[type="checkbox"]')] as HTMLInputElement[]
+    expect(checkboxes[1]!.checked).toBe(true)
+    click(checkboxes[1]!)
+    expect(setIgnorePastedMentions).toHaveBeenCalledWith(false)
     root.unmount()
   })
 
