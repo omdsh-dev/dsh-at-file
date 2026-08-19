@@ -104,6 +104,7 @@ interface RegisteredSettingsSection {
   locale: string
   inject: () => {
     hooks: { scope: { getSnapshot: () => { value: AtFileSettings } } }
+    viewState: { filterScope: 'global' | 'workspace'; selectedWorkspace: string }
     setEnabled: (enabled: boolean) => Promise<void>
     setIgnorePastedMentions: (ignore: boolean) => Promise<void>
     setIgnoreFiles: (ignoreFiles: readonly string[]) => Promise<void>
@@ -414,6 +415,7 @@ describe('dsh-at-file client apply', () => {
     const section = settingsSection(booted)
     expect(section).toMatchObject({ id: 'at-file', order: 55, locale: NS })
     expect(section.label()).toBe('nav')
+    expect(section.inject().viewState).toBe(section.inject().viewState)
     await section.inject().setEnabled(false)
     expect(booted.updateSettings).toHaveBeenCalledWith({ field: 'enabled', value: false })
     await section.inject().setIgnorePastedMentions(false)

@@ -25,7 +25,11 @@ import type { AtFileSettings, AtFileSettingsUpdate, FileEntry, FileIgnoreRuleInp
 import { AT_FILE_REMOTE } from './remote.ts'
 import { createAtFileSource } from './source.ts'
 import { FilesDock, type AtFileDockInjected } from './FilesDock.tsx'
-import { AtFileSection, type AtFileSectionInjected } from './SettingsSection.tsx'
+import {
+  AtFileSection,
+  type AtFileSectionInjected,
+  type AtFileSectionViewState,
+} from './SettingsSection.tsx'
 import { NS, en, zh } from './locales.ts'
 import { adoptStyles } from './styles.ts'
 import { FolderNavigator, type FolderNavigatorInjected } from './FolderNavigator.tsx'
@@ -56,6 +60,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-at-file: dictionaries')
 
   const scope = createSnapshotStore({ value: defaultAtFileSettings() })
+  const settingsViewState: AtFileSectionViewState = { filterScope: 'global', selectedWorkspace: '' }
   let settingsGeneration = 0
   let settingsTail: Promise<void> = Promise.resolve()
 
@@ -247,6 +252,7 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: (): AtFileSectionInjected => ({
       hooks: { scope },
+      viewState: settingsViewState,
       setEnabled: async (enabled: boolean) => { await updateSettings({ field: 'enabled', value: enabled }) },
       setIgnorePastedMentions: async (ignorePastedMentions: boolean) => {
         await updateSettings({ field: 'ignorePastedMentions', value: ignorePastedMentions })

@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import type { ReactElement } from 'react'
-import { AtFileSection, parseIgnoreFile, type AtFileSectionProps } from '../src/client/SettingsSection.tsx'
+import {
+  AtFileSection,
+  parseIgnoreFile,
+  type AtFileSectionProps,
+  type AtFileSectionViewState,
+} from '../src/client/SettingsSection.tsx'
 import { fmt, zh } from '../src/client/locales.ts'
 import { DEFAULT_IGNORE_FILES } from '../src/defaults.ts'
 import type { AtFileSettings, FileIgnoreRuleInput, WorkspaceIgnoreFiles } from '../src/contract.ts'
@@ -39,6 +44,7 @@ function props(over: {
   setIgnorePastedMentions?: (ignore: boolean) => Promise<void>
   setIgnoreFiles?: (ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
   setWorkspaceIgnoreFiles?: (workspace: string, ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
+  viewState?: AtFileSectionViewState
 } = {}): AtFileSectionProps {
   const value: AtFileSettings | undefined = over.unloaded === true
     ? undefined
@@ -62,6 +68,7 @@ function props(over: {
       items: readonly WorkspaceStub[]
       recentWorkspaceId?: string
     }) => T): T => selector({ items, recentWorkspaceId: over.recentWorkspaceId }),
+    viewState: over.viewState ?? { filterScope: 'global', selectedWorkspace: '' },
     setEnabled: over.setEnabled ?? (async () => {}),
     setIgnorePastedMentions: over.setIgnorePastedMentions ?? (async () => {}),
     setIgnoreFiles: over.setIgnoreFiles ?? (async () => {}),
@@ -198,6 +205,25 @@ describe('AtFileSection', () => {
     click(button(container, zh['settings.clearWorkspace']))
     expect(setWorkspaceIgnoreFiles).toHaveBeenCalledWith('/work/two', [])
     root.unmount()
+  })
+
+  it('retains the workspace scope and selection across section remounts', () => {
+    const viewState: AtFileSectionViewState = { filterScope: 'global', selectedWorkspace: '' }
+    const workspaces = [workspace('one', '/work/one', 'One'), workspace('two', '/work/two', 'Two')]
+    const first = mount(<AtFileSection {...props({ workspaces, currentCwd: '/work/one', viewState })} />)
+    click(button(first.container, zh['settings.workspace']))
+    const select = first.container.querySelector('select') as HTMLSelectElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set
+    flushSync(() => {
+      setter?.call(select, '/work/two')
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    first.root.unmount()
+
+    const second = mount(<AtFileSection {...props({ workspaces, currentCwd: '/work/one', viewState })} />)
+    expect(button(second.container, zh['settings.workspace']).getAttribute('aria-selected')).toBe('true')
+    expect((second.container.querySelector('select') as HTMLSelectElement).value).toBe('/work/two')
+    second.root.unmount()
   })
 
   it('reselects an available workspace when the previous choice disappears', () => {
