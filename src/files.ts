@@ -5,7 +5,7 @@
  * hard-stops at the configured entry cap with an honest `truncated` flag.
  */
 import { opendir } from 'node:fs/promises'
-import type { Dir } from 'node:fs'
+import type { Dir, Dirent } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import type { FileEntry, FileIgnoreRuleInput } from './contract.ts'
 import { compileIgnoreRules } from './defaults.ts'
@@ -26,6 +26,9 @@ export interface WorkspaceIndex {
   /** True when the walk hit `maxFiles` before the tree was exhausted. */
   readonly truncated: boolean
 }
+
+/** Directory opener seam used by the real filesystem and deterministic tests. */
+export type OpenWorkspaceDirectory = (path: string) => Promise<Dir>
 
 /** Await `operation`, rejecting with the signal's reason the moment it aborts. */
 function raceAbort<T>(operation: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
@@ -94,12 +97,14 @@ function closeOrSwallow(handle: Dir, signal: AbortSignal | undefined): Promise<v
  * @param root - workspace root to walk.
  * @param options - cap and ignore list.
  * @param signal - caller lifetime; every filesystem await races it.
+ * @param openDirectory - directory opener; defaults to node:fs.
  * @returns the sorted file list and the truncation flag.
  */
 export async function indexWorkspace(
   root: string,
   options: IndexOptions,
   signal?: AbortSignal,
+  openDirectory: OpenWorkspaceDirectory = opendir,
 ): Promise<WorkspaceIndex> {
   const ignoreDirs = new Set(options.ignoreDirs)
   const ignoreRules = compileIgnoreRules(options.ignoreFiles)
@@ -114,14 +119,23 @@ export async function indexWorkspace(
     const dir = queue.shift() as string
     let handle: Dir
     try {
-      handle = await raceAbort(opendir(dir), signal)
+      handle = await raceAbort(openDirectory(dir), signal)
     } catch (error: unknown) {
       signal?.throwIfAborted()
-      throw new Error(`at-file: cannot list "${dir}": ${messageOf(error)}`)
+      if (dir === root) throw new Error(`at-file: cannot list "${dir}": ${messageOf(error)}`)
+      console.warn(`[dsh-at-file] skipping unreadable directory "${dir}": ${messageOf(error)}`)
+      continue
     }
     try {
       for (;;) {
-        const dirent = await raceAbort(handle.read(), signal)
+        let dirent: Dirent | null
+        try {
+          dirent = await raceAbort(handle.read(), signal)
+        } catch (error: unknown) {
+          signal?.throwIfAborted()
+          console.warn(`[dsh-at-file] stopped reading directory "${dir}": ${messageOf(error)}`)
+          break
+        }
         if (dirent === null) break
         if (files.length >= options.maxFiles) {
           truncated = true
