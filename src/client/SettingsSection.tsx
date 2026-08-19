@@ -13,9 +13,19 @@ import {
   workspacePathKey,
 } from '../defaults.ts'
 
-/** Injected business face: the live scope and durable write verbs. */
+export type AtFileFilterScope = 'global' | 'workspace'
+type RuleKind = FileIgnoreRule['kind']
+
+/** Ephemeral settings navigation retained while the plugin stays mounted. */
+export interface AtFileSectionViewState {
+  filterScope: AtFileFilterScope
+  selectedWorkspace: string
+}
+
+/** Injected business face: the live scope, retained view, and durable write verbs. */
 export interface AtFileSectionInjected {
   hooks: { scope: AtFileSettingsSource }
+  viewState: AtFileSectionViewState
   setEnabled: (enabled: boolean) => Promise<void>
   setIgnorePastedMentions: (ignore: boolean) => Promise<void>
   setIgnoreFiles: (ignoreFiles: readonly FileIgnoreRuleInput[]) => Promise<void>
@@ -24,9 +34,6 @@ export interface AtFileSectionInjected {
 
 /** Full section props: runtime share + injected face + locale seat. */
 export type AtFileSectionProps = PropsRuntime<'settings.section'> & InjectFace<AtFileSectionInjected> & PropsLocale<'at-file'>
-
-type FilterScope = 'global' | 'workspace'
-type RuleKind = FileIgnoreRule['kind']
 
 interface WorkspaceOption {
   path: string
@@ -93,6 +100,7 @@ export function AtFileSection({
   useScope,
   useSessions,
   useWorkspaces,
+  viewState,
   setEnabled,
   setIgnorePastedMentions,
   setIgnoreFiles,
@@ -122,12 +130,23 @@ export function AtFileSection({
     ?? workspaceOptions[0]?.path
     ?? ''
 
-  const [filterScope, setFilterScope] = useState<FilterScope>('global')
-  const [selectedWorkspace, setSelectedWorkspace] = useState(preferredWorkspace)
+  const [filterScope, setFilterScopeState] = useState<AtFileFilterScope>(viewState.filterScope)
+  const [selectedWorkspace, setSelectedWorkspaceState] = useState(
+    viewState.selectedWorkspace === '' ? preferredWorkspace : viewState.selectedWorkspace,
+  )
   const [draft, setDraft] = useState('')
   const [ruleKindChoice, setRuleKindChoice] = useState<RuleKind>('exact')
   const [caseSensitive, setCaseSensitive] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const setFilterScope = (next: AtFileFilterScope): void => {
+    viewState.filterScope = next
+    setFilterScopeState(next)
+  }
+  const setSelectedWorkspace = (next: string): void => {
+    viewState.selectedWorkspace = next
+    setSelectedWorkspaceState(next)
+  }
 
   useEffect(() => {
     if (workspaceOptions.length === 0) {
