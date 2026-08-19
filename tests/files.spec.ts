@@ -2,10 +2,11 @@
  * Workspace indexing behavior: bounded traversal, ignored directories,
  * symlink exclusion, deterministic paths, and cancellation.
  */
-import { mkdtemp, mkdir, symlink, writeFile, rm } from 'node:fs/promises'
+import type { Dir } from 'node:fs'
+import { mkdtemp, mkdir, opendir, symlink, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { indexWorkspace } from '../src/files.ts'
 import { DEFAULT_IGNORE_DIRS, DEFAULT_IGNORE_FILES } from '../src/defaults.ts'
 
@@ -113,6 +114,85 @@ describe('indexWorkspace', () => {
       { maxFiles: 10, ignoreDirs: [], ignoreFiles: [] },
       new AbortController().signal,
     )).rejects.toThrow(/cannot list/)
+  })
+
+  it('skips a child directory that cannot be opened', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-unreadable-open-'))
+    const blocked = join(root, 'blocked')
+    await mkdir(blocked)
+    await writeFile(join(root, 'keep.txt'), 'keep\n')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { files } = await indexWorkspace(root, {
+        maxFiles: 10,
+        ignoreDirs: [],
+        ignoreFiles: [],
+      }, undefined, async (dir) => {
+        if (dir === blocked) throw new Error('permission denied')
+        return opendir(dir)
+      })
+      expect(files.map(file => file.relative)).toEqual(['blocked', 'keep.txt'])
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(`skipping unreadable directory "${blocked}"`))
+    } finally {
+      warn.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the partial index when a directory read stops early', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-unreadable-read-'))
+    const blocked = join(root, 'blocked')
+    await mkdir(blocked)
+    await writeFile(join(blocked, 'first.txt'), 'first\n')
+    await writeFile(join(root, 'keep.txt'), 'keep\n')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const { files } = await indexWorkspace(root, {
+        maxFiles: 10,
+        ignoreDirs: [],
+        ignoreFiles: [],
+      }, undefined, async (dir) => {
+        const handle = await opendir(dir)
+        if (dir !== blocked) return handle
+        let first = true
+        return {
+          read: async () => {
+            if (first) {
+              first = false
+              return handle.read()
+            }
+            throw new Error('read denied')
+          },
+          close: async () => handle.close(),
+        } as Dir
+      })
+      expect(files.map(file => file.relative)).toEqual(['blocked', 'blocked/first.txt', 'keep.txt'])
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(`stopped reading directory "${blocked}"`))
+    } finally {
+      warn.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps cancellation fatal while a directory read is pending', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-abort-read-'))
+    const controller = new AbortController()
+    const handle = {
+      read: () => new Promise<never>(() => {}),
+      close: async () => {},
+    } as unknown as Dir
+    try {
+      const indexing = indexWorkspace(root, {
+        maxFiles: 10,
+        ignoreDirs: [],
+        ignoreFiles: [],
+      }, controller.signal, async () => handle)
+      await Promise.resolve()
+      controller.abort(new Error('read cancelled'))
+      await expect(indexing).rejects.toThrow('read cancelled')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('races the walk against an already-aborted signal', async () => {
