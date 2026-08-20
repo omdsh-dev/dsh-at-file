@@ -1,6 +1,6 @@
 /**
  * Workspace indexing behavior: bounded traversal, ignored directories,
- * symlink exclusion, deterministic paths, and cancellation.
+ * symlink traversal, deterministic paths, and cancellation.
  */
 import type { Dir } from 'node:fs'
 import { mkdtemp, mkdir, opendir, symlink, writeFile, rm } from 'node:fs/promises'
@@ -37,6 +37,10 @@ describe('indexWorkspace', () => {
         'file:README.md',
         'file:data.bin',
         'dir:empty',
+        'dir:linked-src',
+        'dir:linked-src/client',
+        'file:linked-src/client/view.ts',
+        'file:linked-src/index.ts',
         'dir:src',
         'dir:src/client',
         'file:src/client/view.ts',
@@ -47,7 +51,7 @@ describe('indexWorkspace', () => {
     }
   })
 
-  it('skips ignore dirs and symlinks', async () => {
+  it('skips ignored directories and follows directory symlinks', async () => {
     const root = await fixture()
     try {
       const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: ['.git', 'node_modules'], ignoreFiles: [] })
@@ -56,7 +60,63 @@ describe('indexWorkspace', () => {
       expect(relatives).toContain('data.bin')
       expect(relatives.some(path => path.includes('node_modules'))).toBe(false)
       expect(relatives.some(path => path.includes('.git'))).toBe(false)
-      expect(relatives.some(path => path.startsWith('linked-src'))).toBe(false)
+      expect(relatives).toContain('linked-src/index.ts')
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('indexes file and external directory links while applying ignore rules', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-link-root-'))
+    const external = await mkdtemp(join(tmpdir(), 'dsh-at-file-link-target-'))
+    try {
+      await writeFile(join(external, 'guide.md'), 'guide\n')
+      await writeFile(join(external, 'secret.log'), 'secret\n')
+      await symlink(external, join(root, 'docs'), 'dir')
+      await symlink(external, join(root, 'ignored-docs'), 'dir')
+      await symlink(join(external, 'guide.md'), join(root, 'guide-link.md'), 'file')
+      await symlink(join(external, 'secret.log'), join(root, 'secret.log'), 'file')
+
+      const { files } = await indexWorkspace(root, {
+        maxFiles: 100,
+        ignoreDirs: ['ignored-docs'],
+        ignoreFiles: ['secret.log'],
+      })
+      expect(files.map(file => `${file.kind}:${file.relative}`)).toEqual([
+        'dir:docs',
+        'file:docs/guide.md',
+        'file:guide-link.md',
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+      await rm(external, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps a cyclic directory link visible without descending into it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-link-cycle-'))
+    try {
+      await mkdir(join(root, 'src'))
+      await writeFile(join(root, 'src', 'index.ts'), 'export {}\n')
+      await symlink(root, join(root, 'src', 'workspace'), 'dir')
+
+      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: [], ignoreFiles: [] })
+      expect(files.map(file => `${file.kind}:${file.relative}`)).toEqual([
+        'dir:src',
+        'file:src/index.ts',
+        'dir:src/workspace',
+      ])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('skips broken symbolic links', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-broken-link-'))
+    try {
+      await symlink(join(root, 'missing.txt'), join(root, 'broken.txt'), 'file')
+      const { files } = await indexWorkspace(root, { maxFiles: 100, ignoreDirs: [], ignoreFiles: [] })
+      expect(files).toEqual([])
     } finally {
       await rm(root, { recursive: true, force: true })
     }
@@ -114,6 +174,20 @@ describe('indexWorkspace', () => {
       { maxFiles: 10, ignoreDirs: [], ignoreFiles: [] },
       new AbortController().signal,
     )).rejects.toThrow(/cannot list/)
+  })
+
+  it('rejects when the workspace root exists but cannot be opened', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-unreadable-root-'))
+    try {
+      await expect(indexWorkspace(
+        root,
+        { maxFiles: 10, ignoreDirs: [], ignoreFiles: [] },
+        undefined,
+        async () => { throw new Error('permission denied') },
+      )).rejects.toThrow(`at-file: cannot list "${root}": permission denied`)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('skips a child directory that cannot be opened', async () => {
@@ -221,7 +295,9 @@ describe('indexWorkspace', () => {
     if (process.platform === 'win32') return context.skip()
     const root = await mkdtemp(join(tmpdir(), 'dsh-at-file-fifo-'))
     const { execFileSync } = await import('node:child_process')
-    execFileSync('mkfifo', [join(root, 'pipe')])
+    const pipe = join(root, 'pipe')
+    execFileSync('mkfifo', [pipe])
+    await symlink(pipe, join(root, 'pipe-link'), 'file')
     try {
       const { files } = await indexWorkspace(root, { maxFiles: 10, ignoreDirs: [], ignoreFiles: [] })
       expect(files).toEqual([])

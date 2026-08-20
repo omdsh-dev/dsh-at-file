@@ -1,10 +1,11 @@
 /**
  * Workspace path indexing over node:fs. The walk streams directories one
  * dirent at a time (memory stays O(one level) even under a giant directory),
- * never follows symlinks, skips configured ignore dirs by basename, and
- * hard-stops at the configured entry cap with an honest `truncated` flag.
+ * follows file and directory symlinks without re-entering an ancestor target,
+ * skips configured ignore dirs by basename, and hard-stops at the configured
+ * entry cap with an honest `truncated` flag.
  */
-import { opendir } from 'node:fs/promises'
+import { opendir, realpath, stat } from 'node:fs/promises'
 import type { Dir, Dirent } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import type { FileEntry, FileIgnoreRuleInput } from './contract.ts'
@@ -29,6 +30,13 @@ export interface WorkspaceIndex {
 
 /** Directory opener seam used by the real filesystem and deterministic tests. */
 export type OpenWorkspaceDirectory = (path: string) => Promise<Dir>
+
+/** One queued directory plus the real targets already present above it. */
+interface DirectoryTask {
+  readonly path: string
+  readonly canonical: string
+  readonly ancestors: ReadonlySet<string>
+}
 
 /** Await `operation`, rejecting with the signal's reason the moment it aborts. */
 function raceAbort<T>(operation: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
@@ -111,12 +119,31 @@ export async function indexWorkspace(
   const compiledRegex = new Map(ignoreRules
     .filter(rule => rule.kind === 'regex')
     .map(rule => [rule, new RegExp(rule.pattern, rule.caseSensitive ? '' : 'i')]))
+  const isIgnoredFile = (name: string): boolean => ignoreRules.some(rule => {
+    if (rule.kind === 'exact') {
+      return rule.caseSensitive ? name === rule.pattern : name.toLowerCase() === rule.pattern.toLowerCase()
+    }
+    return (compiledRegex.get(rule) as RegExp).test(name)
+  })
   const files: FileEntry[] = []
-  const queue: string[] = [root]
+  let rootCanonical: string
+  try {
+    rootCanonical = await raceAbort(realpath(root), signal)
+  } catch (error: unknown) {
+    signal?.throwIfAborted()
+    throw new Error(`at-file: cannot list "${root}": ${messageOf(error)}`)
+  }
+  const queue: DirectoryTask[] = [{ path: root, canonical: rootCanonical, ancestors: new Set() }]
   let truncated = false
   while (queue.length > 0) {
     signal?.throwIfAborted()
-    const dir = queue.shift() as string
+    const task = queue.shift() as DirectoryTask
+    const dir = task.path
+    // Directory links may point to themselves or any parent. Keep the alias as
+    // an indexed entry, but never descend into a target already on this path.
+    if (task.ancestors.has(task.canonical)) continue
+    const childAncestors = new Set(task.ancestors)
+    childAncestors.add(task.canonical)
     let handle: Dir
     try {
       handle = await raceAbort(openDirectory(dir), signal)
@@ -141,25 +168,43 @@ export async function indexWorkspace(
           truncated = true
           break
         }
-        // Symlinked directories are never entered (a link cycle cannot strand
-        // the walk); symlinked files are followed only implicitly through the
-        // dirent of their parent — a symlink dirent itself is skipped.
-        if (dirent.isSymbolicLink()) continue
         const child = join(dir, dirent.name)
+        if (dirent.isSymbolicLink()) {
+          let targetPath: string
+          let target: Awaited<ReturnType<typeof stat>>
+          try {
+            targetPath = await raceAbort(realpath(child), signal)
+            target = await raceAbort(stat(targetPath), signal)
+          } catch {
+            signal?.throwIfAborted()
+            // Broken, inaccessible, and transient links do not invalidate the
+            // rest of the workspace index.
+            continue
+          }
+          if (target.isDirectory()) {
+            if (ignoreDirs.has(dirent.name)) continue
+            files.push({ path: child, relative: displayRelative(root, child), kind: 'dir' })
+            queue.push({ path: child, canonical: targetPath, ancestors: childAncestors })
+            continue
+          }
+          if (target.isFile() && !isIgnoredFile(dirent.name)) {
+            files.push({ path: child, relative: displayRelative(root, child), kind: 'file' })
+          }
+          continue
+        }
         if (dirent.isDirectory()) {
           if (ignoreDirs.has(dirent.name)) continue
           // Directories are indexed entries too, so the picker can reference
           // one path without inspecting its descendants at send time.
           files.push({ path: child, relative: displayRelative(root, child), kind: 'dir' })
-          queue.push(child)
+          queue.push({
+            path: child,
+            canonical: join(task.canonical, dirent.name),
+            ancestors: childAncestors,
+          })
           continue
         }
-        if (dirent.isFile() && !ignoreRules.some(rule => {
-          if (rule.kind === 'exact') {
-            return rule.caseSensitive ? dirent.name === rule.pattern : dirent.name.toLowerCase() === rule.pattern.toLowerCase()
-          }
-          return (compiledRegex.get(rule) as RegExp).test(dirent.name)
-        })) {
+        if (dirent.isFile() && !isIgnoredFile(dirent.name)) {
           files.push({ path: child, relative: displayRelative(root, child), kind: 'file' })
         }
       }
