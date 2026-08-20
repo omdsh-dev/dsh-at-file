@@ -11,6 +11,39 @@ export const STYLE_ID = 'dsh-at-file-style'
 
 /** The dock's injected stylesheet text. */
 export const cssText = `
+/* The shared trigger menu shrink-wraps to its minimum width by default. Once
+   an at-file icon is present, use the menu's standing 537px design cap. Only
+   at-file options are restyled, so another source sharing the trigger keeps
+   its own row layout. Complete basenames wrap above their parent directory. */
+[role='listbox']:has([data-file-icon]) {
+  box-sizing: border-box;
+  width: min(537px, 100%);
+}
+[role='option']:has([data-file-icon]) {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 0;
+  align-items: center;
+}
+[role='option']:has([data-file-icon]) > [aria-hidden] {
+  grid-column: 1;
+  grid-row: 1;
+}
+[role='option']:has([data-file-icon]) > [aria-hidden] + span {
+  grid-column: 2;
+  grid-row: 1;
+  max-width: none;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+[role='option']:has([data-file-icon]) > [aria-hidden] + span + span {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+}
 .dsh_atFile_rail {
   box-sizing: border-box;
   display: flex;
