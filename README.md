@@ -43,10 +43,10 @@ The default index skips common version-control directories, IDE metadata, depend
 ## Install or Update
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.5.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.6.tar.gz
 ```
 
-Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.6.5`.
+Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.6.6`.
 
 ## File Filters
 
@@ -86,7 +86,7 @@ Omitting `ignoreDirs` keeps the built-in list. When you provide it, include ever
 
 ## Path Handling
 
-- The picker indexes regular files and directories in the active workspace. Configured directory names and symbolic links are skipped.
+- The picker indexes regular files, directories, and symbolic links in the active workspace. Directory links are traversed through their workspace-relative alias, while links back to an ancestor are kept visible without being re-entered.
 - Global and workspace file-name filters are combined during the Host index walk, before entries count toward `maxIndexedFiles` or reach the browser.
 - The Host accepts workspace-relative paths. Absolute paths and paths that escape the workspace are ignored.
 - Reference markers are created from typed text and picker selections. Pasted `@` tokens are ignored when the default setting is enabled.

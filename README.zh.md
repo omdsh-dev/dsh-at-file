@@ -43,10 +43,10 @@ DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `
 ## 安装或更新
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.5.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.6.tar.gz
 ```
 
-已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.6.5`。
+已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.6.6`。
 
 ## 文件过滤
 
@@ -86,7 +86,7 @@ dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/re
 
 ## 路径处理
 
-- 选择器索引当前工作区中的常规文件和目录，并跳过已配置的目录名与符号链接。
+- 选择器索引当前工作区中的常规文件、目录和符号链接。目录链接会通过其工作区内的相对别名继续遍历；若链接指回上级目录，则保留该链接但不再进入，以避免循环。
 - Host 遍历工作区时会合并全局和当前工作区的文件名规则。被过滤的条目不会占用 `maxIndexedFiles`，也不会发送到浏览器。
 - Host 接受工作区相对路径。绝对路径以及越出工作区的路径会被忽略。
 - 手动输入的文本和选择器中的选择可以生成引用消息。默认设置开启时，粘贴文本中的 `@` 会被忽略。
