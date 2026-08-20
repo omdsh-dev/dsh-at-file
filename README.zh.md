@@ -36,17 +36,17 @@ DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `
 
 高亮目录候选后，按右方向键可以进入该目录。输入内容会推进到 `@路径/`，末尾不添加空格，候选菜单会继续显示。按回车或使用鼠标选择目录时，仍会完成该目录引用。
 
-候选项优先显示文件名，下方显示父目录。遇到重名文件时，父目录也会写入主标题。内置 SVG 图标可区分目录、源代码、文本、PDF、图片、数据与配置、压缩包以及其他文件。
+候选项优先完整显示文件名，下方显示父目录。有足够空间时，菜单会展开到 537px 的设计宽度；过长文件名会自动换行，不再省略。遇到重名文件时，父目录也会写入主标题。内置 SVG 图标可区分目录、源代码、文本、PDF、图片、数据与配置、压缩包以及其他文件。
 
 默认索引会跳过常见的版本控制目录、IDE 元数据、依赖目录、缓存和构建产物。目前涵盖 VS Code、Visual Studio、JetBrains IDE、Fleet、Eclipse、Android 与 Gradle、Xcode、CMake、Flutter、.NET、Unity、Unreal，以及常见的 JavaScript 和 Python 输出目录。`desktop.ini`、`Thumbs.db` 和 `.DS_Store` 这类系统元数据文件也会默认排除。
 
 ## 安装或更新
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.6.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.7.tar.gz
 ```
 
-已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.6.6`。
+已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.6.7`。
 
 ## 文件过滤
 
