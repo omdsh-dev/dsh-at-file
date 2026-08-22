@@ -1,5 +1,8 @@
 # dsh-at-file
 
+> [!IMPORTANT]
+> The latest official [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) release now includes built-in `@file` and `@session` reference features. Prefer the official implementation for new installations. This plugin remains available for existing setups and will be maintained occasionally on a best-effort basis.
+
 Workspace path references for the DeepSeek Harness web interface. Type `@` in the composer to search the current workspace and insert a file or directory path.
 
 ![@ path picker](assets/screenshots/workspace-path-picker.png)
@@ -32,6 +35,8 @@ This mechanism applies to version `0.3.0` and later. Earlier releases read file 
 
 Plain queries match filenames. Exact names, prefixes, and compact matches rank ahead of looser results, without matching letters scattered across a long directory path.
 
+With an empty query, shallow paths appear before deeper entries; directories appear before files at the same depth. The scrollable menu exposes up to 50 candidates, so root-level files are not displaced by deeply nested directories.
+
 A query containing `/` matches path segments in order. For example, `src/view` can find `src/client/view.ts`. A trailing slash such as `src/` searches within that path.
 
 When a directory is highlighted, press `ArrowRight` to enter it. The draft advances to `@path/` without a trailing space, and the candidate menu stays open for the next selection. `Enter` and pointer selection keep the existing behavior and finish the directory reference.
@@ -43,10 +48,10 @@ The default index skips common version-control directories, IDE metadata, depend
 ## Install or Update
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.7.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.8.tar.gz
 ```
 
-Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.6.7`.
+Use the same command to update an existing installation. Restart `dsh web` after installation so the Host and browser client load version `0.6.8`.
 
 ## File Filters
 

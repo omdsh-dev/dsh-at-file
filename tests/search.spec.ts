@@ -1,7 +1,7 @@
 /**
  * Pure projection behaviors: the @file smart-search ranking and the model-form
  * / path helpers. Deterministic fixtures only — the ranking must stay stable
- * per keystroke (ties break by kind, length, then lexicographically).
+ * per keystroke.
  */
 import { describe, expect, it } from 'vitest'
 import { rankFiles } from '../src/client/search.ts'
@@ -22,7 +22,7 @@ const FILES: readonly FileEntry[] = [
 ]
 
 describe('rankFiles', () => {
-  it('lists directories first, then files, each alphabetical, on an empty query', () => {
+  it('lists directories before files at the same depth on an empty query', () => {
     expect(rankFiles(FILES, '', 3)).toEqual([
       entry('src', 'dir'),
       entry('README.md'),
@@ -31,6 +31,27 @@ describe('rankFiles', () => {
     expect(rankFiles([entry('src', 'dir'), entry('README.md')], '', 2)).toEqual([
       entry('src', 'dir'),
       entry('README.md'),
+    ])
+  })
+
+  it('keeps root entries ahead of deep directories on an empty query', () => {
+    const browsable = [
+      entry('.agents', 'dir'),
+      entry('.agents/skills', 'dir'),
+      entry('.agents/skills/storage-analyzer', 'dir'),
+      entry('src', 'dir'),
+      entry('DSH 配置.md'),
+      entry('README.md'),
+      entry('src/index.ts'),
+    ]
+    expect(rankFiles(browsable, '', 7)).toEqual([
+      entry('.agents', 'dir'),
+      entry('src', 'dir'),
+      entry('DSH 配置.md'),
+      entry('README.md'),
+      entry('.agents/skills', 'dir'),
+      entry('src/index.ts'),
+      entry('.agents/skills/storage-analyzer', 'dir'),
     ])
   })
 

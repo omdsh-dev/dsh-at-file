@@ -27,8 +27,8 @@ declare module '@deepseek-ai/dsh-client-ui-input-trigger/client' {
 /** Owner source name (the lexicon and decoration routing key). */
 export const SOURCE_NAME = 'at-file'
 
-/** Design cap on visible picker rows (menu height mirrors the slash menu). */
-export const MAX_CANDIDATES = 12
+/** Candidate cap for the menu's scrollable viewport. */
+export const MAX_CANDIDATES = 50
 
 /** How long one session's index stays hot before the next menu open refetches. */
 export const INDEX_TTL_MS = 30_000

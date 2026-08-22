@@ -1,5 +1,8 @@
 # dsh-at-file
 
+> [!IMPORTANT]
+> 最新版官方 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 已经内置 `@file` 和 `@session` 引用功能。新安装请优先使用官方实现；本插件继续供现有环境使用，后续随缘维护。
+
 DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `@`，可以搜索当前工作区并插入文件或目录路径。
 
 ![@ 路径选择器](assets/screenshots/workspace-path-picker.png)
@@ -32,6 +35,8 @@ DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `
 
 普通关键词只匹配文件名。完整名称、前缀和紧凑匹配会排在前面，长目录路径中分散的字符不会产生无关结果。
 
+未输入关键词时，浅层路径会排在深层条目前面，同一层级中目录排在文件前面。可滚动菜单最多提供 50 个候选项，根目录文件不会再被深层目录挤出列表。
+
 关键词中包含 `/` 时，选择器会依次匹配路径片段。例如，`src/view` 可以找到 `src/client/view.ts`。输入 `src/` 也可以搜索该路径下的条目。
 
 高亮目录候选后，按右方向键可以进入该目录。输入内容会推进到 `@路径/`，末尾不添加空格，候选菜单会继续显示。按回车或使用鼠标选择目录时，仍会完成该目录引用。
@@ -43,10 +48,10 @@ DeepSeek Harness Web 界面的工作区路径引用插件。在输入框输入 `
 ## 安装或更新
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.7.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-at-file/archive/refs/tags/v0.6.8.tar.gz
 ```
 
-已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.6.7`。
+已有安装也使用这条命令更新。安装完成后重启 `dsh web`，确保 Host 和浏览器客户端加载 `0.6.8`。
 
 ## 文件过滤
 

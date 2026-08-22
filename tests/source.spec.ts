@@ -106,7 +106,7 @@ describe('@file candidates', () => {
     expect(search).toHaveBeenCalledTimes(1)
   })
 
-  it('caps the visible rows at the design limit', async () => {
+  it('caps the candidates available through the scrollable menu', async () => {
     const many: FileEntry[] = Array.from({ length: MAX_CANDIDATES + 5 }, (_, index) => ({
       path: `/ws/f${String(index).padStart(2, '0')}.ts`,
       relative: `f${String(index).padStart(2, '0')}.ts`,
@@ -115,6 +115,22 @@ describe('@file candidates', () => {
     const { source } = harness({ search: vi.fn(async () => many) })
     const rows = await source.candidates(session('s1'), { query: '', position: 'leading', signal: new AbortController().signal })
     expect(rows).toHaveLength(MAX_CANDIDATES)
+  })
+
+  it('keeps a root file visible when deep directories exceed the candidate cap', async () => {
+    const indexed: FileEntry[] = [
+      { path: '/ws/.agents', relative: '.agents', kind: 'dir' },
+      ...Array.from({ length: MAX_CANDIDATES + 5 }, (_, index) => ({
+        path: `/ws/.agents/skill-${String(index).padStart(2, '0')}`,
+        relative: `.agents/skill-${String(index).padStart(2, '0')}`,
+        kind: 'dir' as const,
+      })),
+      { path: '/ws/DSH 配置.md', relative: 'DSH 配置.md', kind: 'file' },
+    ]
+    const { source } = harness({ search: vi.fn(async () => indexed) })
+    const rows = await source.candidates(session('s1'), { query: '', position: 'leading', signal: new AbortController().signal })
+    expect(rows).toHaveLength(MAX_CANDIDATES)
+    expect(rows.slice(0, 2).map(row => row.value)).toEqual(['.agents', 'DSH 配置.md'])
   })
 
   it('yields nothing when a superseded keystroke aborts the caller', async () => {

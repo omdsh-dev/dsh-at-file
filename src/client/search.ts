@@ -2,7 +2,8 @@
  * Pure file-search ranking for the @file menu. A plain query matches basenames
  * only, so letters spread across a long generated path cannot create false
  * positives. Queries containing a slash match path segments in order. The
- * empty query remains a directory-first alphabetical browse view.
+ * empty query is a shallow-first browse view with directories ahead of files
+ * at the same depth.
  */
 import type { FileEntry } from './remote.ts'
 
@@ -14,7 +15,7 @@ export function rankFiles(
 ): readonly FileEntry[] {
   const q = query.trim().toLowerCase()
   if (q === '') {
-    return [...files].sort(byDefault).slice(0, limit)
+    return [...files].sort(byBrowse).slice(0, limit)
   }
   return files
     .map(file => ({ file, score: scorePath(file.relative, q) }))
@@ -27,8 +28,10 @@ export function rankFiles(
     .map(entry => entry.file)
 }
 
-/** Default order: directories first (alphabetical), then files (alphabetical). */
-function byDefault(a: FileEntry, b: FileEntry): number {
+/** Browse order: shallow paths first, then directories and alphabetical paths. */
+function byBrowse(a: FileEntry, b: FileEntry): number {
+  const depth = a.relative.split('/').length - b.relative.split('/').length
+  if (depth !== 0) return depth
   if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1
   // Unique relative paths make the equality arm unreachable.
   /* v8 ignore next -- identical paths cannot both exist in one index. */
